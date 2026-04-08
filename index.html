@@ -6,14 +6,17 @@
     <title>🌍 Офлайн Карта</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
-        body { font-family: Arial, sans-serif; overflow: hidden; background: #0f172a; }
+        body { font-family: system-ui, -apple-system, sans-serif; overflow: hidden; background: #0f172a; color: #fff; }
         
-        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0f172a; display: flex; align-items: center; justify-content: center; z-index: 99999; color: #fff; font-size: 1.2em; }
+        #loader { position: fixed; inset: 0; background: #0f172a; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 99999; }
         #loader.hidden { display: none; }
+        .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.15); border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #error-box { display: none; background: #1e293b; border: 1px solid #ef4444; border-radius: 8px; padding: 15px; margin-top: 15px; max-width: 90%; text-align: left; font-size: 0.9em; color: #fca5a5; }
         
-        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #0f172a, #1e293b); display: flex; align-items: center; justify-content: center; z-index: 10000; }
-        .login-box { background: rgba(255,255,255,0.1); border-radius: 12px; padding: 25px; width: 90%; max-width: 320px; text-align: center; }
-        .login-box h2 { color: #fff; margin-bottom: 15px; }
+        #loginOverlay { position: fixed; inset: 0; background: linear-gradient(135deg, #0f172a, #1e293b); display: flex; align-items: center; justify-content: center; z-index: 10000; }
+        .login-box { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 25px; width: 90%; max-width: 320px; text-align: center; }
+        .login-box h2 { margin-bottom: 15px; }
         .login-box input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.1); color: #fff; font-size: 1em; }
         .login-btn { width: 100%; padding: 10px; margin: 5px 0; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1em; }
         .btn-admin { background: #3b82f6; color: #fff; }
@@ -22,8 +25,7 @@
 
         #map { width: 100vw; height: 100vh; background: #1e3a5f; position: relative; overflow: hidden; cursor: grab; }
         #map:active { cursor: grabbing; }
-        
-        #grid { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
         
         #adminPanel { position: fixed; top: 10px; left: 10px; z-index: 1000; display: none; flex-direction: column; gap: 5px; }
         .panel-btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85em; background: #22c55e; color: #fff; font-weight: 600; }
@@ -31,14 +33,14 @@
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
         
         #photoPopup { position: fixed; z-index: 2000; display: none; background: rgba(15,23,42,0.98); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 10px; max-width: 320px; left: 50%; top: 50%; transform: translate(-50%,-50%); box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
-        #photoPopup img { width: 100%; border-radius: 8px; max-height: 280px; object-fit: contain; background: #000; }
-        #photoPopup .info { color: #fff; padding: 10px 0 5px; font-size: 0.9em; }
+        #photoPopup img { width: 100%; border-radius: 8px; max-height: 280px; object-fit: contain; background: #000; display: block; }
+        #photoPopup .info { padding: 10px 0 5px; font-size: 0.9em; }
         #photoPopup .coords { color: #94a3b8; font-size: 0.8em; }
-        #photoPopup .close { position: absolute; top: 8px; right: 12px; color: #fff; font-size: 28px; cursor: pointer; background: none; border: none; line-height: 1; }
+        #photoPopup .close { position: absolute; top: 8px; right: 12px; font-size: 28px; cursor: pointer; background: none; border: none; color: #fff; }
         
-        #addModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2500; display: none; align-items: center; justify-content: center; }
+        #addModal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2500; display: none; align-items: center; justify-content: center; }
         .modal { background: #1e293b; border-radius: 12px; padding: 20px; width: 90%; max-width: 340px; text-align: center; border: 1px solid rgba(255,255,255,0.1); }
-        .modal h3 { color: #fff; margin-bottom: 15px; }
+        .modal h3 { margin-bottom: 15px; }
         #preview { width: 100%; max-height: 220px; object-fit: contain; border-radius: 8px; margin: 10px 0; background: #000; display: none; }
         .file-lbl { display: inline-block; padding: 10px 18px; background: #3b82f6; color: #fff; border-radius: 6px; cursor: pointer; margin: 10px 0; font-weight: 600; }
         .file-lbl input { display: none; }
@@ -47,22 +49,25 @@
         .btn-save { background: #22c55e; color: #fff; }
         .btn-cancel { background: rgba(255,255,255,0.2); color: #fff; }
         
-        #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); padding: 10px 20px; background: #22c55e; color: #fff; border-radius: 8px; z-index: 99999; display: none; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); padding: 10px 20px; background: #22c55e; color: #fff; border-radius: 8px; z-index: 99999; display: none; font-weight: 600; }
         
-        .marker { position: absolute; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; transform: translate(-50%,-50%); display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.4); border: 3px solid #fff; transition: transform 0.2s; }
-        .marker:hover { transform: translate(-50%,-50%) scale(1.15); }
+        .marker { position: absolute; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; transform: translate(-50%,-50%); display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.4); border: 3px solid #fff; }
         .marker.photo { background: #3b82f6; }
         .marker.track { background: #f59e0b; animation: blink 1s infinite; }
         .marker.del { background: #ef4444; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
         
-        #coords { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: #fff; padding: 5px 10px; border-radius: 6px; font-size: 0.85em; z-index: 1000; }
+        #coords { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 6px; font-size: 0.85em; z-index: 1000; }
         #zoomCtrl { position: fixed; bottom: 10px; left: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 3px; }
         #zoomCtrl button { width: 36px; height: 36px; border: none; border-radius: 6px; background: rgba(255,255,255,0.9); color: #0f172a; font-size: 1.2em; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="loader">Загрузка...</div>
+    <div id="loader">
+        <div class="spinner"></div>
+        <div>Загрузка карты...</div>
+        <div id="error-box"></div>
+    </div>
     
     <div id="loginOverlay">
         <div class="login-box">
@@ -111,6 +116,14 @@
     <div id="toast"></div>
 
     <script>
+        // ЛОВУШКА ОШИБОК: показывает проблему на экране вместо зависания
+        window.onerror = function(msg, url, line, col, error) {
+            document.getElementById('error-box').style.display = 'block';
+            document.getElementById('error-box').innerHTML = `<b>❌ Ошибка JS:</b><br>${msg}<br>Строка: ${line}`;
+            document.querySelector('.spinner').style.display = 'none';
+            return false;
+        };
+
         const PASS = "myglobe123";
         let isAdmin=false, tracking=false, addMode=false, delMode=false;
         let canvas, ctx, map;
@@ -131,32 +144,34 @@
         document.getElementById('pwd').addEventListener('keypress', e=>{if(e.key==='Enter')login(true);});
 
         function init() {
-            canvas=document.getElementById('grid');
-            ctx=canvas.getContext('2d');
-            map=document.getElementById('map');
-            
-            resize();
-            window.addEventListener('resize',resize);
-            
-            // События мыши
-            map.addEventListener('mousedown',dragStart);
-            map.addEventListener('mousemove',drag);
-            map.addEventListener('mouseup',dragEnd);
-            map.addEventListener('mouseleave',dragEnd);
-            map.addEventListener('wheel',wheel);
-            map.addEventListener('click',click);
-            
-            // Тач события
-            map.addEventListener('touchstart',touchStart,{passive:false});
-            map.addEventListener('touchmove',touchMove,{passive:false});
-            map.addEventListener('touchend',dragEnd);
-            
-            document.getElementById('loader').classList.add('hidden');
-            if(isAdmin) document.getElementById('adminPanel').style.display='flex';
-            
-            loadPoints();
-            draw();
-            showToast('✅ Карта готова! Работает офлайн');
+            try {
+                canvas=document.getElementById('grid');
+                ctx=canvas.getContext('2d');
+                map=document.getElementById('map');
+                
+                resize();
+                window.addEventListener('resize',resize);
+                
+                map.addEventListener('mousedown',dragStart);
+                map.addEventListener('mousemove',drag);
+                map.addEventListener('mouseup',dragEnd);
+                map.addEventListener('mouseleave',dragEnd);
+                map.addEventListener('wheel',wheel);
+                map.addEventListener('click',click);
+                
+                map.addEventListener('touchstart',touchStart,{passive:false});
+                map.addEventListener('touchmove',touchMove,{passive:false});
+                map.addEventListener('touchend',dragEnd);
+                
+                document.getElementById('loader').classList.add('hidden');
+                if(isAdmin) document.getElementById('adminPanel').style.display='flex';
+                
+                loadPoints();
+                draw();
+                showToast('✅ Карта готова!');
+            } catch(e) {
+                window.onerror(e.message, '', 0, 0, e);
+            }
         }
 
         function resize() {
@@ -167,98 +182,74 @@
 
         function draw() {
             ctx.clearRect(0,0,canvas.width,canvas.height);
-            
-            // Фон океана
             ctx.fillStyle='#1e3a5f';
             ctx.fillRect(0,0,canvas.width,canvas.height);
             
-            // Сетка координат
             const scale=Math.pow(2,zoomLevel);
-            const gridSize=50*scale;
-            const offsetX=centerX%gridSize;
-            const offsetY=centerY%gridSize;
+            const gridSize=Math.max(20, 50*scale);
+            const offX=centerX%gridSize;
+            const offY=centerY%gridSize;
             
             ctx.strokeStyle='rgba(255,255,255,0.1)';
             ctx.lineWidth=1;
             ctx.beginPath();
-            for(let x=offsetX;x<canvas.width;x+=gridSize){
-                ctx.moveTo(x,0); ctx.lineTo(x,canvas.height);
-            }
-            for(let y=offsetY;y<canvas.height;y+=gridSize){
-                ctx.moveTo(0,y); ctx.lineTo(canvas.width,y);
-            }
+            for(let x=offX;x<canvas.width;x+=gridSize){ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);}
+            for(let y=offY;y<canvas.height;y+=gridSize){ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);}
             ctx.stroke();
             
-            // Экватор и меридианы
             ctx.strokeStyle='rgba(255,255,255,0.3)';
             ctx.lineWidth=2;
-            const centerScreenX=canvas.width/2-centerX;
-            const centerScreenY=canvas.height/2-centerY;
+            ctx.beginPath(); ctx.moveTo(0,latToY(0)); ctx.lineTo(canvas.width,latToY(0)); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(lngToX(0),0); ctx.lineTo(lngToX(0),canvas.height); ctx.stroke();
             
-            // Экватор (0 широта)
-            const eqY=latToY(0);
-            ctx.beginPath(); ctx.moveTo(0,eqY); ctx.lineTo(canvas.width,eqY); ctx.stroke();
-            
-            // Гринвич (0 долгота)
-            const grnX=lngToX(0);
-            ctx.beginPath(); ctx.moveTo(grnX,0); ctx.lineTo(grnX,canvas.height); ctx.stroke();
-            
-            // Рендер маркеров
             Object.values(markers).forEach(renderMarker);
             
-            // Обновление координат
-            const centerLat=yToLat(canvas.height/2);
-            const centerLng=xToLng(canvas.width/2);
-            document.getElementById('coords').textContent=`${centerLat.toFixed(4)}, ${centerLng.toFixed(4)}`;
+            const cLat=yToLat(canvas.height/2);
+            const cLng=xToLng(canvas.width/2);
+            document.getElementById('coords').textContent=`${cLat.toFixed(4)}, ${cLng.toFixed(4)}`;
         }
 
         function latToY(lat) {
             const scale=Math.pow(2,zoomLevel)*TILE_SIZE;
-            const latRad=lat*Math.PI/180;
-            const y=(1-Math.log(Math.tan(latRad)+1/Math.cos(latRad))/Math.PI)/2*scale;
+            const r=lat*Math.PI/180;
+            const y=(1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*scale;
             return canvas.height/2-(y-centerY);
         }
-
         function lngToX(lng) {
             const scale=Math.pow(2,zoomLevel)*TILE_SIZE;
             const x=(lng+180)/360*scale;
             return canvas.width/2-(x-centerX);
         }
-
         function yToLat(y) {
             const scale=Math.pow(2,zoomLevel)*TILE_SIZE;
-            const yNorm=(canvas.height/2-(y-centerY))/scale;
-            const latRad=Math.atan(Math.sinh(Math.PI*(1-2*yNorm)));
-            return latRad*180/Math.PI;
+            const n=(canvas.height/2-(y-centerY))/scale;
+            return Math.atan(Math.sinh(Math.PI*(1-2*n)))*180/Math.PI;
         }
-
         function xToLng(x) {
             const scale=Math.pow(2,zoomLevel)*TILE_SIZE;
-            const xPix=canvas.width/2-(x-centerX);
-            return xPix/scale*360-180;
+            return (canvas.width/2-(x-centerX))/scale*360-180;
         }
 
         function renderMarker(m) {
-            if(m.element) m.element.remove();
-            
+            if(m.el) m.el.remove();
             const el=document.createElement('div');
             el.className='marker'+(m.data.photo?' photo':'')+(m.track?' track':'')+(delMode?' del':'');
-            el.textContent=m.track?'📍':(m.data.photo?'🖼':'📌');
+            el.textContent=m.track?'📍':(m.data.photo?'🖼':'');
             el.style.left=lngToX(m.data.lng)+'px';
             el.style.top=latToY(m.data.lat)+'px';
             el.onclick=e=>{e.stopPropagation();markerClick(m);};
             map.appendChild(el);
-            m.element=el;
+            m.el=el;
         }
 
         function dragStart(e){isDragging=true;lastX=e.clientX;lastY=e.clientY;map.style.cursor='grabbing';}
-        function drag(e){if(!isDragging)return;const dx=e.clientX-lastX;const dy=e.clientY-lastY;centerX-=dx;centerY-=dy;lastX=e.clientX;lastY=e.clientY;draw();}
+        function drag(e){if(!isDragging)return;centerX-=(e.clientX-lastX);centerY-=(e.clientY-lastY);lastX=e.clientX;lastY=e.clientY;draw();}
         function dragEnd(){isDragging=false;map.style.cursor='default';}
         function wheel(e){e.preventDefault();zoom(e.deltaY>0?-1:1);}
-        function zoom(dir){zoomLevel=Math.max(1,Math.min(19,zoomLevel+dir));draw();}
+        function zoom(d){zoomLevel=Math.max(1,Math.min(19,zoomLevel+d));draw();}
         
         function touchStart(e){if(e.touches.length===1){isDragging=true;lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;e.preventDefault();}}
-        function touchMove(e){if(!isDragging)return;const dx=e.touches[0].clientX-lastX;const dy=e.touches[0].clientY-lastY;centerX-=dx;centerY-=dy;lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;draw();e.preventDefault();}
+        function touchMove(e){if(!isDragging)return;centerX-=(e.touches[0].clientX-lastX);centerY-=(e.touches[0].clientY-lastY);lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;draw();e.preventDefault();}
 
         function click(e){
             if(e.target.classList.contains('marker'))return;
@@ -269,16 +260,16 @@
         }
 
         function markerClick(m){
-            if(delMode && isAdmin){deletePoint(m.id);}
-            else if(m.data.photo){showPopup(m.data);}
+            if(delMode && isAdmin) deletePoint(m.id);
+            else if(m.data.photo) showPopup(m.data);
         }
 
         function toggleTrack(){
             if(!isAdmin)return;
-            if(tracking)stopTrack();else startTrack();
+            if(tracking) stopTrack(); else startTrack();
         }
         function startTrack(){
-            if(!navigator.geolocation)return showToast('❌ GPS недоступен');
+            if(!navigator.geolocation) return showToast('❌ GPS недоступен');
             tracking=true;
             document.getElementById('btnTrack').classList.add('active');
             watchId=navigator.geolocation.watchPosition(p=>updateTrack(p.coords.latitude,p.coords.longitude),e=>showToast('Ошибка GPS'),{enableHighAccuracy:true,maximumAge:5000});
@@ -286,14 +277,13 @@
         }
         function stopTrack(){
             tracking=false;
-            if(watchId)navigator.geolocation.clearWatch(watchId);
-            if(trackMarker){delete markers[trackMarker.id];trackMarker=null;draw();}
+            if(watchId) navigator.geolocation.clearWatch(watchId);
+            if(trackMarker) { delete markers[trackMarker.id]; trackMarker=null; draw(); }
             document.getElementById('btnTrack').classList.remove('active');
         }
         function updateTrack(lat,lng){
-            if(trackMarker){trackMarker.data={lat,lng};renderMarker(trackMarker);}
-            else{trackMarker={id:'track',data:{lat,lng},track:true};markers[trackMarker.id]=trackMarker;renderMarker(trackMarker);}
-            // Центрирование на точке
+            if(trackMarker) { trackMarker.data={lat,lng}; renderMarker(trackMarker); }
+            else { trackMarker={id:'track', data:{lat,lng}, track:true}; markers[trackMarker.id]=trackMarker; renderMarker(trackMarker); }
             centerX=canvas.width/2-lngToX(lng);
             centerY=canvas.height/2-latToY(lat);
             draw();
@@ -305,28 +295,28 @@
         function closeModal(){document.getElementById('addModal').style.display='none';pending=null;photo=null;document.getElementById('preview').style.display='none';document.getElementById('fileIn').value='';}
         function previewFile(e){
             const f=e.target.files[0];if(!f)return;
-            if(f.size>5*1024*1024)return showToast('❌ Макс 5МБ');
+            if(f.size>5*1024*1024) return showToast('❌ Макс 5МБ');
             const r=new FileReader();
             r.onload=ev=>{photo=ev.target.result;document.getElementById('preview').src=photo;document.getElementById('preview').style.display='block';};
             r.readAsDataURL(f);
         }
         function savePoint(){
-            if(!pending)return;
+            if(!pending) return;
             const d={id:'p_'+Date.now(),lat:pending.lat,lng:pending.lng,photo:photo,ts:Date.now()};
             const pts=getPts();pts.push(d);localStorage.setItem('globePts',JSON.stringify(pts));
-            const m={id:d.id,data:d};markers[m.id]=m;renderMarker(m);
+            const m={id:d.id, data:d};markers[m.id]=m;renderMarker(m);
             closeModal();showToast('✅ Точка добавлена');
         }
 
         function getPts(){try{return JSON.parse(localStorage.getItem('globePts')||'[]');}catch{return[];}}
         function loadPoints(){
             const pts=getPts();
-            pts.forEach(p=>{const m={id:p.id,data:p};markers[m.id]=m;});
+            pts.forEach(p=>{const m={id:p.id, data:p};markers[m.id]=m;});
         }
         function deletePoint(id){
             const pts=getPts().filter(p=>p.id!==id);
             localStorage.setItem('globePts',JSON.stringify(pts));
-            if(markers[id]){if(markers[id].element)markers[id].element.remove();delete markers[id];}
+            if(markers[id]){if(markers[id].el)markers[id].el.remove();delete markers[id];}
             showToast('🗑 Удалено');
         }
 
