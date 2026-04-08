@@ -3,252 +3,288 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Permissions-Policy" content="geolocation=*">
-    <title>🌍 Мой Глобус</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <title>🌍 Моя Карта</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; overflow: hidden; background: #000; }
-        #map { width: 100vw; height: 100vh; z-index: 1; }
+        body { font-family: Arial, sans-serif; overflow: hidden; background: #1a1a2e; }
         
         #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0a1a; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 99999; color: #fff; }
         #loader.hidden { display: none; }
-        .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.15); border-top-color: #4facfe; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
         
-        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); display: flex; align-items: center; justify-content: center; z-index: 10000; }
-        .login-box { background: rgba(255,255,255,0.05); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 30px; width: 90%; max-width: 380px; text-align: center; }
-        .login-box input { width: 100%; padding: 12px; border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; background: rgba(255,255,255,0.08); color: #fff; font-size: 1em; margin-bottom: 12px; }
-        .login-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; font-size: 1em; font-weight: 600; cursor: pointer; margin-bottom: 8px; }
-        .btn-admin { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
-        .btn-visitor { background: rgba(255,255,255,0.1); color: #ccc; border: 1px solid rgba(255,255,255,0.2); }
-        #loginError { color: #ff6b6b; margin-top: 8px; display: none; }
-
-        #adminPanel { position: fixed; top: 15px; left: 15px; z-index: 1000; display: none; flex-direction: column; gap: 8px; }
-        .panel-btn { padding: 10px 16px; border: none; border-radius: 10px; font-size: 0.9em; font-weight: 600; cursor: pointer; backdrop-filter: blur(10px); display: flex; align-items: center; gap: 6px; }
-        .btn-track { background: rgba(46,213,115,0.9); color: #fff; }
-        .btn-track.active { background: rgba(255,71,87,0.9); animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
-        .btn-add { background: rgba(100,200,255,0.9); color: #fff; }
-        .btn-add.active { background: rgba(255,165,2,0.9); }
-        .btn-del { background: rgba(255,71,87,0.9); color: #fff; }
-
-        #photoPopup { position: fixed; z-index: 2000; display: none; background: rgba(20,20,40,0.95); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; overflow: hidden; max-width: 340px; left: 50%; top: 50%; transform: translate(-50%, -50%); box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
-        #photoPopup img { width: 100%; max-height: 280px; object-fit: cover; }
-        #photoPopup .info { padding: 10px 14px; color: #fff; }
-        #photoPopup .close { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; border: none; cursor: pointer; }
-
-        #addModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2500; display: none; align-items: center; justify-content: center; }
-        .modal { background: linear-gradient(135deg, #1a1a2e, #16213e); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 25px; width: 90%; max-width: 400px; text-align: center; }
+        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #0f0c29, #302b63); display: flex; align-items: center; justify-content: center; z-index: 10000; }
+        .login-box { background: rgba(255,255,255,0.1); border-radius: 16px; padding: 30px; width: 90%; max-width: 350px; text-align: center; }
+        .login-box input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; background: rgba(255,255,255,0.1); color: #fff; }
+        .login-btn { width: 100%; padding: 12px; margin: 5px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .btn-admin { background: #667eea; color: #fff; }
+        .btn-visitor { background: rgba(255,255,255,0.2); color: #fff; }
+        
+        #map { width: 100vw; height: 100vh; background: #1a4d2e; position: relative; overflow: hidden; }
+        
+        #adminPanel { position: fixed; top: 10px; left: 10px; z-index: 1000; display: none; flex-direction: column; gap: 5px; }
+        .panel-btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; background: rgba(46,213,115,0.9); color: #fff; }
+        .panel-btn.active { background: rgba(255,71,87,0.9); animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+        
+        #photoPopup { position: fixed; z-index: 2000; display: none; background: rgba(0,0,0,0.9); border-radius: 12px; padding: 10px; max-width: 300px; left: 50%; top: 50%; transform: translate(-50%,-50%); }
+        #photoPopup img { width: 100%; border-radius: 8px; max-height: 250px; object-fit: cover; }
+        #photoPopup .close { position: absolute; top: 5px; right: 10px; color: #fff; font-size: 24px; cursor: pointer; background: none; border: none; }
+        
+        #addModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2500; display: none; align-items: center; justify-content: center; }
+        .modal { background: #16213e; border-radius: 16px; padding: 20px; width: 90%; max-width: 350px; text-align: center; }
         .modal h3 { color: #fff; margin-bottom: 15px; }
-        #preview { width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; margin-bottom: 12px; display: none; }
-        .file-lbl { display: inline-block; padding: 10px 20px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border-radius: 10px; cursor: pointer; margin-bottom: 12px; }
+        #preview { width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; margin: 10px 0; display: none; }
+        .file-lbl { display: inline-block; padding: 10px 15px; background: #667eea; color: #fff; border-radius: 6px; cursor: pointer; margin: 10px 0; }
         .file-lbl input { display: none; }
-        .modal-btns { display: flex; gap: 8px; }
-        .modal-btns button { flex: 1; padding: 10px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .modal-btns { display: flex; gap: 10px; margin-top: 10px; }
+        .modal-btns button { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; }
         .btn-save { background: #2ed573; color: #fff; }
-        .btn-cancel { background: rgba(255,255,255,0.1); color: #ccc; }
-
-        #geoStatus { position: fixed; bottom: 12px; left: 12px; z-index: 1000; padding: 6px 12px; border-radius: 8px; background: rgba(46,213,115,0.9); color: #fff; display: none; }
-        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 10px; color: #fff; z-index: 99999; animation: tIn 0.3s, tOut 0.3s 2.7s forwards; }
-        .toast-s { background: rgba(46,213,115,0.9); }
-        .toast-e { background: rgba(255,71,87,0.9); }
-        .toast-i { background: rgba(100,200,255,0.9); }
-        @keyframes tIn { from{opacity:0;transform:translateX(-50%) translateY(15px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
-        @keyframes tOut { to{opacity:0} }
+        .btn-cancel { background: rgba(255,255,255,0.2); color: #fff; }
+        
+        #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 10px 20px; background: rgba(46,213,115,0.9); color: #fff; border-radius: 8px; z-index: 99999; display: none; }
+        
+        .marker { position: absolute; width: 30px; height: 30px; background: #ff4757; border: 3px solid #fff; border-radius: 50%; cursor: pointer; transform: translate(-50%,-50%); box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .marker.photo { background: #64c8ff; }
+        .marker.track { background: #ffa502; animation: blink 1s infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        
+        .tile { position: absolute; background-size: 256px 256px; image-rendering: pixelated; }
     </style>
 </head>
 <body>
-    <div id="loader"><div class="spinner"></div><div>Загрузка карты...</div></div>
+    <div id="loader">Загрузка...</div>
+    
     <div id="loginOverlay">
         <div class="login-box">
-            <h2 style="color:#fff;margin-bottom:8px;">🌍 Мой Глобус</h2>
-            <input type="password" id="pwdInput" placeholder="Пароль">
+            <h2 style="color:#fff;margin-bottom:10px;">🌍 Карта</h2>
+            <input type="password" id="pwd" placeholder="Пароль">
             <button class="login-btn btn-admin" onclick="login(true)">🔐 Владелец</button>
             <button class="login-btn btn-visitor" onclick="login(false)">👁 Гость</button>
-            <div id="loginError">Неверно!</div>
+            <div id="loginError" style="color:#ff6b6b;margin-top:8px;display:none;">Ошибка!</div>
         </div>
     </div>
 
     <div id="map"></div>
-
+    
     <div id="adminPanel">
-        <button class="panel-btn btn-track" id="btnTrack" onclick="toggleTrack()">📍 Геолокация</button>
-        <button class="panel-btn btn-add" id="btnAdd" onclick="toggleAdd()">📌 Точка</button>
-        <button class="panel-btn btn-del" id="btnDel" onclick="toggleDel()">🗑 Удалить</button>
+        <button class="panel-btn" id="btnTrack" onclick="toggleTrack()">📍 GPS</button>
+        <button class="panel-btn" id="btnAdd" onclick="toggleAdd()">📌 Точка</button>
+        <button class="panel-btn" id="btnDel" onclick="toggleDel()">🗑 Удалить</button>
     </div>
 
     <div id="photoPopup">
-        <button class="close" onclick="closePopup()">✕</button>
+        <button class="close" onclick="closePopup()">×</button>
         <img id="popImg" src="" alt="">
-        <div class="info"><div id="popTitle"></div><div id="popCoords" style="color:#888;font-size:0.85em;margin-top:4px;"></div></div>
+        <div id="popInfo" style="color:#fff;padding:8px 0;"></div>
     </div>
 
     <div id="addModal">
         <div class="modal">
-            <h3>📌 Новая точка</h3>
+            <h3>📌 Точка</h3>
             <img id="preview">
             <label class="file-lbl">📷 Фото<input type="file" id="fileIn" accept="image/*" onchange="previewFile(event)"></label>
             <div class="modal-btns">
                 <button class="btn-cancel" onclick="closeModal()">Отмена</button>
-                <button class="btn-save" onclick="savePoint()">Сохранить</button>
+                <button class="btn-save" onclick="savePoint()">OK</button>
             </div>
         </div>
     </div>
+    
+    <div id="toast"></div>
 
-    <div id="geoStatus">📍 Активно</div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         const PASS = "myglobe123";
-        let map, isAdmin=false, tracking=false, addMode=false, delMode=false;
-        let trackMarker=null, watchId=null, markers={};
-        let pending=null, photo=null;
+        let isAdmin=false, tracking=false, addMode=false, delMode=false;
+        let map, center={lat:20,lng:0}, zoom=2, watchId=null;
+        let markers={}, trackMarker=null, pending=null, photo=null;
+        let offsetX=0, offsetY=0, isDragging=false, startX, startY;
 
         function login(admin) {
-            if(admin && document.getElementById('pwdInput').value !== PASS) {
+            if(admin && document.getElementById('pwd').value !== PASS) {
                 const e=document.getElementById('loginError'); e.style.display='block'; setTimeout(()=>e.style.display='none',2000); return;
             }
             isAdmin=admin;
             document.getElementById('loginOverlay').style.display='none';
             initMap();
         }
-        document.getElementById('pwdInput').addEventListener('keypress', e=>{ if(e.key==='Enter') login(true); });
+        document.getElementById('pwd').addEventListener('keypress', e=>{if(e.key==='Enter')login(true);});
 
         function initMap() {
-            map = L.map('map').setView([20, 0], 2);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap',
-                maxZoom: 19
-            }).addTo(map);
+            map=document.getElementById('map');
+            map.innerHTML='';
+            
+            // Обработчики событий
+            map.addEventListener('mousedown',onDragStart);
+            map.addEventListener('mousemove',onDrag);
+            map.addEventListener('mouseup',onDragEnd);
+            map.addEventListener('mouseleave',onDragEnd);
+            map.addEventListener('wheel',onWheel);
+            map.addEventListener('click',onClick);
+            
+            // Тач события для мобильных
+            map.addEventListener('touchstart',onTouchStart,{passive:false});
+            map.addEventListener('touchmove',onTouchMove,{passive:false});
+            map.addEventListener('touchend',onDragEnd);
             
             document.getElementById('loader').classList.add('hidden');
             if(isAdmin) document.getElementById('adminPanel').style.display='flex';
             
-            map.on('click', onMapClick);
+            renderMap();
             loadPoints();
-            toast('🌍 Карта готова!','s');
+            showToast('✅ Карта готова!');
         }
 
-        function onMapClick(e) {
-            if(addMode && isAdmin) {
-                pending = e.latlng;
-                document.getElementById('addModal').style.display='flex';
-                return;
+        function latLngToPixel(lat,lng) {
+            const scale=Math.pow(2,zoom)*256;
+            const x=(lng+180)/360*scale;
+            const latRad=lat*Math.PI/180;
+            const y=(1-Math.log(Math.tan(latRad)+1/Math.cos(latRad))/Math.PI)/2*scale;
+            return {x:x-offsetX,y:y-offsetY};
+        }
+
+        function pixelToLatLng(x,y) {
+            const scale=Math.pow(2,zoom)*256;
+            const lng=(x+offsetX)/scale*360-180;
+            const yNorm=(y+offsetY)/scale;
+            const latRad=Math.atan(Math.sinh(Math.PI*(1-2*yNorm)));
+            return {lat:latRad*180/Math.PI,lng};
+        }
+
+        function renderMap() {
+            map.innerHTML='';
+            const scale=Math.pow(2,zoom)*256;
+            const tileSize=256;
+            
+            const centerPix={x:offsetX,y:offsetY};
+            const startTileX=Math.floor((offsetX-window.innerWidth/2)/tileSize);
+            const endTileX=Math.ceil((offsetX+window.innerWidth/2)/tileSize);
+            const startTileY=Math.floor((offsetY-window.innerHeight/2)/tileSize);
+            const endTileY=Math.ceil((offsetY+window.innerHeight/2)/tileSize);
+            
+            for(let x=startTileX;x<=endTileX;x++){
+                for(let y=startTileY;y<=endTileY;y++){
+                    const tile=document.createElement('div');
+                    tile.className='tile';
+                    tile.style.width=tileSize+'px';
+                    tile.style.height=tileSize+'px';
+                    tile.style.left=(x*tileSize-(offsetX-window.innerWidth/2))+'px';
+                    tile.style.top=(y*tileSize-(offsetY-window.innerHeight/2))+'px';
+                    tile.style.backgroundImage=`url(https://tile.openstreetmap.org/${zoom}/${x}/${y}.png)`;
+                    map.appendChild(tile);
+                }
             }
             
-            map.eachLayer(layer => {
-                if(layer._pointId) {
-                    const dist = map.distance(e.latlng, layer.getLatLng());
-                    if(dist < 20) {
-                        if(delMode && isAdmin) {
-                            deletePoint(layer._pointId);
-                        } else {
-                            showPopup(layer);
-                        }
-                    }
-                }
-            });
-            closePopup();
+            // Рендер маркеров
+            Object.values(markers).forEach(m=>renderMarker(m));
+            if(trackMarker) renderMarker(trackMarker);
         }
 
-        function toggleTrack() {
-            if(!isAdmin) return;
-            if(tracking) stopTrack(); else startTrack();
+        function renderMarker(m) {
+            const el=document.createElement('div');
+            el.className='marker'+(m.data.photo?' photo':'')+(m.track?' track':'');
+            el.textContent=m.track?'📍':(m.data.photo?'🖼':'📌');
+            const pix=latLngToPixel(m.data.lat,m.data.lng);
+            el.style.left=pix.x+'px';
+            el.style.top=pix.y+'px';
+            el.onclick=e=>{e.stopPropagation();onMarkerClick(m);};
+            map.appendChild(el);
+            m.element=el;
         }
-        function startTrack() {
-            if(!navigator.geolocation) return toast('❌ GPS недоступен','e');
+
+        function onDragStart(e){isDragging=true;startX=e.clientX-offsetX;startY=e.clientY-offsetY;map.style.cursor='grabbing';}
+        function onDrag(e){if(!isDragging)return;offsetX=e.clientX-startX;offsetY=e.clientY-startY;renderMap();}
+        function onDragEnd(){isDragging=false;map.style.cursor='default';}
+        function onWheel(e){e.preventDefault();zoom+=e.deltaY>0?-0.5:0.5;zoom=Math.max(1,Math.min(19,zoom));renderMap();}
+        
+        function onTouchStart(e){if(e.touches.length===1){isDragging=true;startX=e.touches[0].clientX-offsetX;startY=e.touches[0].clientY-offsetY;}}
+        function onTouchMove(e){if(!isDragging)return;e.preventDefault();offsetX=e.touches[0].clientX-startX;offsetY=e.touches[0].clientY-startY;renderMap();}
+
+        function onClick(e){
+            if(e.target.classList.contains('marker'))return;
+            if(addMode && isAdmin){
+                const rect=map.getBoundingClientRect();
+                pending=pixelToLatLng(e.clientX-rect.left,e.clientY-rect.top);
+                document.getElementById('addModal').style.display='flex';
+            }
+        }
+
+        function onMarkerClick(m){
+            if(delMode && isAdmin){deletePoint(m.id);}
+            else if(m.data.photo){showPopup(m.data);}
+        }
+
+        function toggleTrack(){
+            if(!isAdmin)return;
+            if(tracking)stopTrack();else startTrack();
+        }
+        function startTrack(){
+            if(!navigator.geolocation)return showToast('❌ GPS недоступен');
             tracking=true;
             document.getElementById('btnTrack').classList.add('active');
-            document.getElementById('geoStatus').style.display='block';
-            watchId = navigator.geolocation.watchPosition(p=>updateTrack(p.coords.latitude, p.coords.longitude), e=>toast('Ошибка GPS','e'), {enableHighAccuracy:true});
-            toast('📍 Отслеживание включено','s');
+            watchId=navigator.geolocation.watchPosition(p=>updateTrack(p.coords.latitude,p.coords.longitude),e=>showToast('Ошибка GPS'),{enableHighAccuracy:true});
+            showToast('📍 GPS включен');
         }
-        function stopTrack() {
+        function stopTrack(){
             tracking=false;
-            if(watchId) navigator.geolocation.clearWatch(watchId);
-            if(trackMarker) { map.removeLayer(trackMarker); trackMarker=null; }
+            if(watchId)navigator.geolocation.clearWatch(watchId);
+            if(trackMarker){delete markers[trackMarker.id];trackMarker=null;renderMap();}
             document.getElementById('btnTrack').classList.remove('active');
-            document.getElementById('geoStatus').style.display='none';
         }
-        function updateTrack(lat,lng) {
-            if(trackMarker) trackMarker.setLatLng([lat,lng]);
-            else {
-                trackMarker = L.marker([lat,lng], {
-                    icon: L.divIcon({html:'📍', className:'track-marker', iconSize:[30,30]})
-                }).addTo(map).bindPopup('📍 Вы здесь').openPopup();
+        function updateTrack(lat,lng){
+            if(trackMarker){trackMarker.data={lat,lng};renderMarker(trackMarker);}
+            else{
+                trackMarker={id:'track',data:{lat,lng},track:true};
+                markers[trackMarker.id]=trackMarker;
+                renderMarker(trackMarker);
             }
-            map.setView([lat,lng], 15);
+            center={lat,lng};
+            const pix=latLngToPixel(lat,lng);
+            offsetX=pix.x-window.innerWidth/2;
+            offsetY=pix.y-window.innerHeight/2;
+            renderMap();
         }
 
-        function toggleAdd() {
-            if(!isAdmin) return;
-            addMode=!addMode; delMode=false;
-            document.getElementById('btnAdd').classList.toggle('active');
-            document.getElementById('btnAdd').textContent = addMode ? '📌 Кликните на карту' : '📌 Точка';
-            if(addMode) toast('📌 Кликните на карту','i');
-        }
-        function toggleDel() {
-            if(!isAdmin) return;
-            delMode=!delMode; addMode=false;
-            document.getElementById('btnAdd').classList.remove('active');
-            document.getElementById('btnDel').classList.toggle('active');
-            if(delMode) toast('🗑 Кликните на точку','i');
-        }
+        function toggleAdd(){addMode=!addMode;delMode=false;document.getElementById('btnAdd').classList.toggle('active');if(addMode)showToast('📌 Кликните на карту');}
+        function toggleDel(){delMode=!delMode;addMode=false;document.getElementById('btnDel').classList.toggle('active');if(delMode)showToast('🗑 Кликните на точку');}
 
-        function closeModal() {
-            document.getElementById('addModal').style.display='none';
-            pending=null; photo=null;
-            document.getElementById('preview').style.display='none';
-            document.getElementById('fileIn').value='';
-        }
-        function previewFile(e) {
-            const f=e.target.files[0]; if(!f) return;
-            if(f.size>5*1024*1024) return toast('❌ Макс 5МБ','e');
+        function closeModal(){document.getElementById('addModal').style.display='none';pending=null;photo=null;document.getElementById('preview').style.display='none';document.getElementById('fileIn').value='';}
+        function previewFile(e){
+            const f=e.target.files[0];if(!f)return;
+            if(f.size>5*1024*1024)return showToast('❌ Макс 5МБ');
             const r=new FileReader();
-            r.onload=ev=>{ photo=ev.target.result; document.getElementById('preview').src=photo; document.getElementById('preview').style.display='block'; };
+            r.onload=ev=>{photo=ev.target.result;document.getElementById('preview').src=photo;document.getElementById('preview').style.display='block';};
             r.readAsDataURL(f);
         }
-        function savePoint() {
-            if(!pending) return;
-            const d={id:'p_'+Date.now(), lat:pending.lat, lng:pending.lng, photo:photo, ts:Date.now()};
-            const pts=getPts(); pts.push(d); localStorage.setItem('globePts',JSON.stringify(pts));
-            addMarker(d);
-            closeModal(); toast('✅ Добавлено','s');
+        function savePoint(){
+            if(!pending)return;
+            const d={id:'p_'+Date.now(),lat:pending.lat,lng:pending.lng,photo:photo,ts:Date.now()};
+            const pts=getPts();pts.push(d);localStorage.setItem('globePts',JSON.stringify(pts));
+            const m={id:d.id,data:d};markers[m.id]=m;renderMarker(m);
+            closeModal();showToast('✅ Добавлено');
         }
 
-        function getPts() { try{return JSON.parse(localStorage.getItem('globePts')||'[]');}catch{return[];} }
-        function loadPoints() { getPts().forEach(p=>addMarker(p)); }
-        function addMarker(d) {
-            const icon = d.photo ? '🖼' : '📌';
-            const m = L.marker([d.lat, d.lng]).addTo(map);
-            m._pointId = d.id; m._data = d;
-            m.bindPopup(`${icon} Точка`);
-            markers[d.id] = m;
+        function getPts(){try{return JSON.parse(localStorage.getItem('globePts')||'[]');}catch{return[];}}
+        function loadPoints(){
+            const pts=getPts();
+            pts.forEach(p=>{const m={id:p.id,data:p};markers[m.id]=m;});
         }
-        function deletePoint(id) {
+        function deletePoint(id){
             const pts=getPts().filter(p=>p.id!==id);
             localStorage.setItem('globePts',JSON.stringify(pts));
-            if(markers[id]) { map.removeLayer(markers[id]); delete markers[id]; }
-            closePopup(); toast('🗑 Удалено','s');
+            if(markers[id]){if(markers[id].element)markers[id].element.remove();delete markers[id];renderMap();}
+            showToast('🗑 Удалено');
         }
 
-        function showPopup(layer) {
-            const d=layer._data;
+        function showPopup(d){
             document.getElementById('popImg').src=d.photo||'';
             document.getElementById('popImg').style.display=d.photo?'block':'none';
-            document.getElementById('popTitle').textContent='📌 '+new Date(d.ts).toLocaleString('ru-RU');
-            document.getElementById('popCoords').textContent=d.lat.toFixed(5)+', '+d.lng.toFixed(5);
+            document.getElementById('popInfo').innerHTML=`📌 ${new Date(d.ts).toLocaleString('ru-RU')}<br><small>${d.lat.toFixed(5)}, ${d.lng.toFixed(5)}</small>`;
             document.getElementById('photoPopup').style.display='block';
         }
-        function closePopup() { document.getElementById('photoPopup').style.display='none'; }
-
-        function toast(msg,type='i') {
-            const t=document.createElement('div'); t.className='toast toast-'+type; t.textContent=msg;
-            document.body.appendChild(t); setTimeout(()=>t.remove(),3000);
-        }
-        document.addEventListener('click', e=>{ if(!document.getElementById('photoPopup').contains(e.target)) closePopup(); });
-        document.addEventListener('keydown', e=>{ if(e.key==='Escape'){closePopup();closeModal();if(addMode)toggleAdd();if(delMode)toggleDel();} });
+        function closePopup(){document.getElementById('photoPopup').style.display='none';}
+        function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',3000);}
+        
+        document.addEventListener('keydown',e=>{if(e.key==='Escape'){closePopup();closeModal();if(addMode)toggleAdd();if(delMode)toggleDel();}});
+        document.addEventListener('click',e=>{if(!document.getElementById('photoPopup').contains(e.target))closePopup();});
     </script>
 </body>
 </html>
