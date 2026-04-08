@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>🌍 Мой Глобус</title>
+
+    <!-- CDN через jsDelivr (стабильнее в РФ) -->
+    <script src="https://cdn.jsdelivr.net/npm/cesium@1.119.0/Build/Cesium/Cesium.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/cesium@1.119.0/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; overflow: hidden; background: #000; }
+        
+        #cesiumContainer {
+            width: 100vw; height: 100vh; position: relative;
+            background: #000;
+        }
+
+        /* Экран загрузки/ошибки */
+        #statusOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #0f0c29; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 99999;
+            color: #fff; text-align: center; padding: 20px;
+        }
+        #statusOverlay.hidden { display: none; }
+        .loader { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.2);
+                  border-top-color: #64c8ff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Все остальные стили остаются прежними (логин, кнопки, модалки) */
+        /* ... [вставьте сюда все CSS из предыдущего кода] ... */
+        
+        /* Для краткости вставлю только ключевые исправления в CSS контейнера */
+        #adminPanel { position: fixed; top: 15px; left: 15px; z-index: 9000; display: none; flex-direction: column; gap: 8px; }
+        .panel-btn { padding: 12px 20px; border: none; border-radius: 12px; font-size: 0.95em; font-weight: 600; cursor: pointer; backdrop-filter: blur(15px); display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+        .btn-track { background: rgba(46,213,115,0.85); color: #fff; }
+        .btn-track.active { background: rgba(255,71,87,0.85); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%,100%{box-shadow:0 4px 15px rgba(255,71,87,0.3)} 50%{box-shadow:0 4px 25px rgba(255,71,87,0.6)} }
+        .btn-add-point { background: rgba(100,200,255,0.85); color: #fff; }
+        .btn-add-point.active { background: rgba(255,165,2,0.85); }
+        .btn-delete-mode { background: rgba(255,71,87,0.85); color: #fff; }
+        .btn-delete-mode.active { background: rgba(255,0,0,1); }
+        #photoPopup { position: fixed; z-index: 8000; display: none; background: rgba(20,20,40,0.95); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; overflow: hidden; max-width: 350px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); animation: popIn 0.3s ease; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+        @keyframes popIn { from{transform:translate(-50%,-50%) scale(0.8);opacity:0} to{transform:translate(-50%,-50%) scale(1);opacity:1} }
+        #photoPopup img { width: 100%; max-height: 300px; object-fit: cover; display: block; }
+        #photoPopup .popup-info { padding: 12px 16px; color: #fff; }
+        #photoPopup .popup-info .coords { font-size: 0.8em; color: #888; margin-top: 4px; }
+        #photoPopup .close-popup { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; border: none; font-size: 1.2em; cursor: pointer; }
+        #addPointModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 9500; display: none; align-items: center; justify-content: center; }
+        .modal-content { background: linear-gradient(135deg, #1a1a2e, #16213e); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 30px; width: 90%; max-width: 420px; text-align: center; }
+        .modal-content h2 { color: #fff; margin-bottom: 20px; }
+        .modal-content .preview-img { width: 100%; max-height: 250px; object-fit: cover; border-radius: 12px; margin-bottom: 15px; display: none; }
+        .file-label { display: inline-block; padding: 12px 25px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border-radius: 12px; cursor: pointer; font-weight: 600; margin-bottom: 15px; }
+        .file-label input { display: none; }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 10px; }
+        .modal-buttons button { flex: 1; padding: 12px; border: none; border-radius: 12px; font-size: 1em; font-weight: 600; cursor: pointer; }
+        .btn-save { background: linear-gradient(135deg, #2ed573, #26a65b); color: #fff; }
+        .btn-cancel { background: rgba(255,255,255,0.1); color: #ccc; border: 1px solid rgba(255,255,255,0.2); }
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); padding: 12px 25px; border-radius: 12px; color: #fff; font-weight: 600; z-index: 99999; animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards; backdrop-filter: blur(15px); }
+        .toast-success { background: rgba(46,213,115,0.9); }
+        .toast-error { background: rgba(255,71,87,0.9); }
+        .toast-info { background: rgba(100,200,255,0.9); }
+        @keyframes toastIn { from{opacity:0;transform:translateX(-50%) translateY(20px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+        @keyframes toastOut { from{opacity:1} to{opacity:0} }
+        #geoStatus { position: fixed; bottom: 15px; left: 15px; z-index: 8000; padding: 8px 15px; border-radius: 10px; font-size: 0.85em; backdrop-filter: blur(10px); display: none; background: rgba(46,213,115,0.8); color: #fff; }
+        #geoStatus.active { display: block; }
+        #instructions { position: fixed; top: 15px; right: 15px; z-index: 8000; background: rgba(20,20,40,0.85); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 15px 20px; color: #ccc; font-size: 0.85em; max-width: 250px; display: none; }
+        #instructions h3 { color: #fff; margin-bottom: 8px; }
+        #instructions ul { list-style: none; padding: 0; }
+        #instructions li { margin-bottom: 5px; padding-left: 5px; }
+        #showInstructions { position: fixed; top: 15px; right: 15px; z-index: 8500; width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 1.3em; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
+        #showInstructions:hover { background: rgba(255,255,255,0.2); }
+        @media (max-width: 600px) {
+            #loginOverlay h1 { font-size: 1.8em; }
+            .login-box { padding: 25px; }
+            .panel-btn { padding: 10px 14px; font-size: 0.85em; }
+            #instructions { max-width: 200px; font-size: 0.8em; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loginOverlay">
+        <h1>🌍 Мой Глобус</h1>
+        <p>Интерактивная карта с геолокацией</p>
+        <div class="login-box">
+            <input type="password" id="passwordInput" placeholder="Пароль администратора" autocomplete="off">
+            <button class="login-btn btn-admin" onclick="loginAdmin()" style="width:100%;padding:15px;border:none;border-radius:12px;font-size:1.1em;font-weight:600;cursor:pointer;margin-bottom:10px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;">🔐 Войти как владелец</button>
+            <button class="login-btn btn-visitor" onclick="loginVisitor()" style="width:100%;padding:15px;border:1px solid rgba(255,255,255,0.2);border-radius:12px;font-size:1.1em;font-weight:600;cursor:pointer;background:rgba(255,255,255,0.1);color:#ccc;">👁 Смотреть карту</button>
+            <div class="login-error" id="loginError" style="color:#ff6b6b;margin-top:10px;font-size:0.9em;display:none;">Неверный пароль!</div>
+        </div>
+    </div>
+
+    <div id="statusOverlay">
+        <div class="loader"></div>
+        <div id="statusText">Загрузка глобуса...</div>
+    </div>
+
+    <div id="cesiumContainer"></div>
+
+    <div id="adminPanel">
+        <button class="panel-btn btn-track" id="btnTrack" onclick="toggleTracking()">📍 Геолокация: ВЫКЛ</button>
+        <button class="panel-btn btn-add-point" id="btnAddPoint" onclick="toggleAddMode()">📌 Добавить точку</button>
+        <button class="panel-btn btn-delete-mode" id="btnDeleteMode" onclick="toggleDeleteMode()">🗑 Режим удаления</button>
+    </div>
+
+    <button id="showInstructions" onclick="toggleInstructions()">?</button>
+    <div id="instructions">
+        <h3>📖 Управление</h3>
+        <ul>
+            <li>🖱 Крутить — зажать и тянуть</li>
+            <li>🔍 Зум — колёсико / щипок</li>
+            <li>📍 Геолокация — показать ваше местоположение</li>
+            <li>📌 Точка — кликните на карту, выберите фото</li>
+            <li>🖼 Фото — клик на точку откроет фото</li>
+            <li>🗑 Удаление — включите режим и клик на точку</li>
+        </ul>
+    </div>
+
+    <div id="photoPopup">
+        <button class="close-popup" onclick="closePopup()">✕</button>
+        <img id="popupImage" src="" alt="Фото">
+        <div class="popup-info">
+            <div id="popupTitle"></div>
+            <div class="coords" id="popupCoords"></div>
+        </div>
+    </div>
+
+    <div id="addPointModal">
+        <div class="modal-content">
+            <h2>📌 Новая точка</h2>
+            <img class="preview-img" id="previewImg">
+            <label class="file-label">
+                📷 Выбрать фото
+                <input type="file" id="photoInput" accept="image/*" onchange="previewPhoto(event)">
+            </label>
+            <div class="modal-buttons">
+                <button class="btn-cancel" onclick="cancelAddPoint()">Отмена</button>
+                <button class="btn-save" onclick="savePoint()">💾 Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="geoStatus">📍 Отслеживание активно</div>
+
+    <script>
+        const ADMIN_PASSWORD = "myglobe123"; // <-- ВАШ ПАРОЛЬ
+        let viewer = null, isAdmin = false, isTracking = false, isAddMode = false, isDeleteMode = false;
+        let watchId = null, trackingEntity = null, trackedEntities = [];
+        let pendingPoint = null, pendingPhoto = null;
+
+        function loginAdmin() {
+            if (document.getElementById('passwordInput').value === ADMIN_PASSWORD) {
+                isAdmin = true; hideLogin(); initApp();
+            } else { showErrorLogin(); }
+        }
+        function loginVisitor() { isAdmin = false; hideLogin(); initApp(); }
+        function hideLogin() { document.getElementById('loginOverlay').style.display = 'none'; }
+        function showErrorLogin() { const e = document.getElementById('loginError'); e.style.display = 'block'; setTimeout(()=>e.style.display='none', 3000); }
+        document.getElementById('passwordInput').addEventListener('keypress', e => { if(e.key==='Enter') loginAdmin(); });
+
+        function updateStatus(text, isError=false) {
+            const ov = document.getElementById('statusOverlay');
+            const tx = document.getElementById('statusText');
+            tx.textContent = text;
+            tx.style.color = isError ? '#ff6b6b' : '#fff';
+            if (!isError) setTimeout(() => ov.classList.add('hidden'), 800);
+        }
+
+        function initApp() {
+            if (viewer) return;
+            try {
+                // Проверка WebGL
+                const canvas = document.createElement('canvas');
+                if (!canvas.getContext('webgl') && !canvas.getContext('experimental-webgl')) {
+                    updateStatus('❌ Ваш браузер не поддерживает WebGL. Обновите браузер.', true);
+                    return;
+                }
+
+                // Инициализация Cesium
+                Cesium.Ion.defaultAccessToken = ''; // Работает с OSM без токена
+                viewer = new Cesium.Viewer('cesiumContainer', {
+                    baseLayerPicker: false, geocoder: false, homeButton: false,
+                    sceneModePicker: false, navigationHelpButton: false,
+                    animation: false, timeline: false, fullscreenButton: false,
+                    selectionIndicator: false, infoBox: false,
+                    imageryProvider: new Cesium.OpenStreetMapImageryProvider({ url: 'https://tile.openstreetmap.org/' })
+                });
+                viewer._cesiumWidget._creditContainer.style.display = 'none';
+                viewer.scene.globe.enableLighting = true;
+                
+                if (isAdmin) document.getElementById('adminPanel').style.display = 'flex';
+                setupClickHandler();
+                loadSavedPoints();
+                updateStatus('✅ Глобус загружен');
+                showToast('🌍 Карта готова!', 'success');
+            } catch (err) {
+                console.error(err);
+                updateStatus('❌ Ошибка загрузки: ' + err.message, true);
+            }
+        }
+
+        function setupClickHandler() {
+            const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+            handler.setInputAction(function (movement) {
+                const ray = viewer.camera.getPickRay(movement.position);
+                const intersection = viewer.scene.globe.pick(ray, viewer.scene);
+                if (!intersection) { closePopup(); return; }
+                const cartographic = Cesium.Cartographic.fromCartesian(intersection);
+                const lat = Cesium.Math.toDegrees(cartographic.latitude);
+                const lng = Cesium.Math.toDegrees(cartographic.longitude);
+                const picked = viewer.scene.pick(movement.position);
+
+                if (picked && picked.id && picked.id._pointType === 'saved') {
+                    isDeleteMode ? deletePoint(picked.id._pointId) : showPhotoPopup(picked.id);
+                    return;
+                }
+                if (isAddMode && isAdmin) { pendingPoint = { lat, lng }; openAddPointModal(); return; }
+                closePopup();
+            }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+        }
+
+        // Геолокация
+        function toggleTracking() {
+            if (!isAdmin) return;
+            isTracking ? stopTracking() : startTracking();
+        }
+        function startTracking() {
+            if (!navigator.geolocation) return showToast('❌ Геолокация не поддерживается', 'error');
+            isTracking = true;
+            document.getElementById('btnTrack').classList.add('active');
+            document.getElementById('btnTrack').innerHTML = '📍 Геолокация: ВКЛ';
+            document.getElementById('geoStatus').classList.add('active');
+            watchId = navigator.geolocation.watchPosition(
+                p => { updateTrackingMarker(p.coords.latitude, p.coords.longitude); },
+                e => { showToast('❌ Ошибка геолокации', 'error'); stopTracking(); },
+                { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+            );
+            showToast('📍 Геолокация запущена', 'success');
+        }
+        function stopTracking() {
+            isTracking = false; if(watchId) navigator.geolocation.clearWatch(watchId);
+            if(trackingEntity) { viewer.entities.remove(trackingEntity); trackingEntity=null; }
+            document.getElementById('btnTrack').classList.remove('active');
+            document.getElementById('btnTrack').innerHTML = '📍 Геолокация: ВЫКЛ';
+            document.getElementById('geoStatus').classList.remove('active');
+        }
+        function updateTrackingMarker(lat, lng) {
+            if (!trackingEntity) {
+                trackingEntity = viewer.entities.add({
+                    position: Cesium.Cartesian3.fromDegrees(lng, lat),
+                    point: { pixelSize: 16, color: Cesium.Color.fromCssColorString('#ff4757'), outlineColor: Cesium.Color.WHITE, outlineWidth: 3, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND },
+                    label: { text: '📍 Вы здесь', font: '16px sans-serif', fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -20), heightReference: Cesium.HeightReference.CLAMP_TO_GROUND, showBackground: true, backgroundColor: Cesium.Color.fromCssColorString('rgba(0,0,0,0.6)') },
+                    _pointType: 'tracking'
+                });
+            } else {
+                trackingEntity.position = Cesium.Cartesian3.fromDegrees(lng, lat);
+            }
+            viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(lng, lat, 50000), orientation: { heading: 0, pitch: Cesium.Math.toRadians(-45), roll: 0 } });
+        }
+
+        // Точки
+        function toggleAddMode() { if(!isAdmin)return; isAddMode=!isAddMode; isDeleteMode=false; document.getElementById('btnDeleteMode').classList.remove('active');
+            const btn = document.getElementById('btnAddPoint'); btn.classList.toggle('active');
+            btn.innerHTML = isAddMode ? '📌 Кликните на карту' : '📌 Добавить точку';
+            isAddMode ? showToast('📌 Кликните на карту', 'info') : null;
+        }
+        function openAddPointModal() { document.getElementById('addPointModal').style.display='flex'; document.getElementById('previewImg').style.display='none'; document.getElementById('photoInput').value=''; pendingPhoto=null; }
+        function cancelAddPoint() { document.getElementById('addPointModal').style.display='none'; pendingPoint=null; pendingPhoto=null; }
+        function previewPhoto(e) {
+            const f=e.target.files[0]; if(!f)return;
+            if(f.size>5*1024*1024) return showToast('❌ Макс 5МБ','error');
+            const r=new FileReader(); r.onload=ev=>{ pendingPhoto=ev.target.result; document.getElementById('previewImg').src=pendingPhoto; document.getElementById('previewImg').style.display='block'; }; r.readAsDataURL(f);
+        }
+        function savePoint() {
+            if(!pendingPoint) return;
+            const pt = { id:'p_'+Date.now(), lat:pendingPoint.lat, lng:pendingPoint.lng, photo:pendingPhoto, ts:Date.now() };
+            addSavedPoint(pt); addPointToMap(pt);
+            document.getElementById('addPointModal').style.display='none'; pendingPoint=null; pendingPhoto=null;
+            showToast('✅ Точка добавлена','success');
+        }
+        function toggleDeleteMode() { if(!isAdmin)return; isDeleteMode=!isDeleteMode; isAddMode=false; document.getElementById('btnAddPoint').classList.remove('active');
+            document.getElementById('btnDeleteMode').classList.toggle('active');
+            isDeleteMode ? showToast('🗑 Кликните на точку','info') : null;
+        }
+        function deletePoint(id) {
+            removeSavedPoint(id);
+            const i=trackedEntities.findIndex(e=>e._pointId===id); if(i!==-1){viewer.entities.remove(trackedEntities[i]); trackedEntities.splice(i,1);}
+            closePopup(); showToast('🗑 Удалено','success');
+        }
+
+        // Хранилище
+        function getSavedPoints() { try{return JSON.parse(localStorage.getItem('globePoints')||'[]');}catch{return[];} }
+        function addSavedPoint(d) { const p=getSavedPoints(); p.push(d); localStorage.setItem('globePoints',JSON.stringify(p)); }
+        function removeSavedPoint(id) { localStorage.setItem('globePoints',JSON.stringify(getSavedPoints().filter(p=>p.id!==id))); }
+        function loadSavedPoints() { getSavedPoints().forEach(p=>addPointToMap(p)); }
+        function addPointToMap(d) {
+            const hasPhoto = !!d.photo;
+            const ent = viewer.entities.add({
+                position: Cesium.Cartesian3.fromDegrees(d.lng, d.lat),
+                point: { pixelSize: hasPhoto?18:12, color: hasPhoto?Cesium.Color.fromCssColorString('#64c8ff'):Cesium.Color.fromCssColorString('#ffa502'), outlineColor:Cesium.Color.WHITE, outlineWidth:3, heightReference:Cesium.HeightReference.CLAMP_TO_GROUND },
+                label: { text: hasPhoto?'🖼 Фото':'📌', font:'14px sans-serif', fillColor:Cesium.Color.WHITE, outlineColor:Cesium.Color.BLACK, outlineWidth:3, style:Cesium.LabelStyle.FILL_AND_OUTLINE, verticalOrigin:Cesium.VerticalOrigin.BOTTOM, pixelOffset:new Cesium.Cartesian2(0,-18), heightReference:Cesium.HeightReference.CLAMP_TO_GROUND, showBackground:true, backgroundColor:Cesium.Color.fromCssColorString('rgba(0,0,0,0.6)') },
+                _pointType:'saved', _pointId:d.id, _pointData:d
+            });
+            trackedEntities.push(ent);
+        }
+
+        // Попап
+        function showPhotoPopup(ent) {
+            const d=ent._pointData; document.getElementById('popupImage').src=d.photo||''; document.getElementById('popupImage').style.display=d.photo?'block':'none';
+            document.getElementById('popupTitle').textContent='📌 Точка от '+new Date(d.ts).toLocaleString('ru-RU');
+            document.getElementById('popupCoords').textContent=d.lat.toFixed(6)+', '+d.lng.toFixed(6);
+            document.getElementById('photoPopup').style.display='block';
+        }
+        function closePopup() { document.getElementById('photoPopup').style.display='none'; }
+
+        // Утилиты
+        function toggleInstructions() { const el=document.getElementById('instructions'); el.style.display=el.style.display==='none'?'block':'none'; }
+        function showToast(msg, type='info') {
+            const t=document.createElement('div'); t.className='toast toast-'+type; t.textContent=msg;
+            document.body.appendChild(t); setTimeout(()=>t.remove(),3000);
+        }
+        document.addEventListener('click', e=>{ const p=document.getElementById('photoPopup'); if(p.style.display==='block'&&!p.contains(e.target)) closePopup(); });
+        document.addEventListener('keydown', e=>{ if(e.key==='Escape'){closePopup();cancelAddPoint();if(isAddMode)toggleAddMode();if(isDeleteMode)toggleDeleteMode();} });
+    </script>
+</body>
+</html>
