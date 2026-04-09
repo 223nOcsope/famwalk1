@@ -2,336 +2,1206 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🌍 Офлайн Карта</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
-        body { font-family: system-ui, -apple-system, sans-serif; overflow: hidden; background: #0f172a; color: #fff; }
-        
-        #loader { position: fixed; inset: 0; background: #0f172a; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 99999; }
-        #loader.hidden { display: none; }
-        .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.15); border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        #error-box { display: none; background: #1e293b; border: 1px solid #ef4444; border-radius: 8px; padding: 15px; margin-top: 15px; max-width: 90%; text-align: left; font-size: 0.9em; color: #fca5a5; }
-        
-        #loginOverlay { position: fixed; inset: 0; background: linear-gradient(135deg, #0f172a, #1e293b); display: flex; align-items: center; justify-content: center; z-index: 10000; }
-        .login-box { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 25px; width: 90%; max-width: 320px; text-align: center; }
-        .login-box h2 { margin-bottom: 15px; }
-        .login-box input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.1); color: #fff; font-size: 1em; }
-        .login-btn { width: 100%; padding: 10px; margin: 5px 0; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1em; }
-        .btn-admin { background: #3b82f6; color: #fff; }
-        .btn-visitor { background: rgba(255,255,255,0.2); color: #fff; }
-        #loginError { color: #ef4444; margin-top: 8px; display: none; }
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>🌍 Мой 3D Глобус</title>
 
-        #map { width: 100vw; height: 100vh; background: #1e3a5f; position: relative; overflow: hidden; cursor: grab; }
-        #map:active { cursor: grabbing; }
-        canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
-        
-        #adminPanel { position: fixed; top: 10px; left: 10px; z-index: 1000; display: none; flex-direction: column; gap: 5px; }
-        .panel-btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85em; background: #22c55e; color: #fff; font-weight: 600; }
-        .panel-btn.active { background: #ef4444; animation: pulse 1s infinite; }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
-        
-        #photoPopup { position: fixed; z-index: 2000; display: none; background: rgba(15,23,42,0.98); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 10px; max-width: 320px; left: 50%; top: 50%; transform: translate(-50%,-50%); box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
-        #photoPopup img { width: 100%; border-radius: 8px; max-height: 280px; object-fit: contain; background: #000; display: block; }
-        #photoPopup .info { padding: 10px 0 5px; font-size: 0.9em; }
-        #photoPopup .coords { color: #94a3b8; font-size: 0.8em; }
-        #photoPopup .close { position: absolute; top: 8px; right: 12px; font-size: 28px; cursor: pointer; background: none; border: none; color: #fff; }
-        
-        #addModal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2500; display: none; align-items: center; justify-content: center; }
-        .modal { background: #1e293b; border-radius: 12px; padding: 20px; width: 90%; max-width: 340px; text-align: center; border: 1px solid rgba(255,255,255,0.1); }
-        .modal h3 { margin-bottom: 15px; }
-        #preview { width: 100%; max-height: 220px; object-fit: contain; border-radius: 8px; margin: 10px 0; background: #000; display: none; }
-        .file-lbl { display: inline-block; padding: 10px 18px; background: #3b82f6; color: #fff; border-radius: 6px; cursor: pointer; margin: 10px 0; font-weight: 600; }
-        .file-lbl input { display: none; }
-        .modal-btns { display: flex; gap: 10px; margin-top: 15px; }
-        .modal-btns button { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
-        .btn-save { background: #22c55e; color: #fff; }
-        .btn-cancel { background: rgba(255,255,255,0.2); color: #fff; }
-        
-        #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); padding: 10px 20px; background: #22c55e; color: #fff; border-radius: 8px; z-index: 99999; display: none; font-weight: 600; }
-        
-        .marker { position: absolute; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; transform: translate(-50%,-50%); display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.4); border: 3px solid #fff; }
-        .marker.photo { background: #3b82f6; }
-        .marker.track { background: #f59e0b; animation: blink 1s infinite; }
-        .marker.del { background: #ef4444; }
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
-        
-        #coords { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 6px; font-size: 0.85em; z-index: 1000; }
-        #zoomCtrl { position: fixed; bottom: 10px; left: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 3px; }
-        #zoomCtrl button { width: 36px; height: 36px; border: none; border-radius: 6px; background: rgba(255,255,255,0.9); color: #0f172a; font-size: 1.2em; cursor: pointer; font-weight: bold; }
+    <!-- CesiumJS -->
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #cesiumContainer {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* ===== АДМИН ПАНЕЛЬ ===== */
+        .admin-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .admin-toggle:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .admin-panel {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            z-index: 999;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 16px;
+            padding: 24px;
+            color: white;
+            width: 320px;
+            max-height: 80vh;
+            overflow-y: auto;
+            display: none;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .admin-panel.active {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .admin-panel h3 {
+            margin-bottom: 16px;
+            font-size: 18px;
+            color: #4fc3f7;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .admin-panel label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: #aaa;
+            margin-top: 12px;
+        }
+
+        .admin-panel input[type="text"],
+        .admin-panel input[type="password"],
+        .admin-panel input[type="file"] {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 14px;
+            outline: none;
+            transition: border 0.3s;
+        }
+
+        .admin-panel input:focus {
+            border-color: #4fc3f7;
+        }
+
+        .admin-panel input::placeholder {
+            color: #666;
+        }
+
+        .admin-panel button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4fc3f7, #2196f3);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(33,150,243,0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef5350, #d32f2f);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(211,47,47,0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #66bb6a, #43a047);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(67,160,71,0.4);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.05);
+            font-size: 13px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.active { background: #4caf50; }
+        .status-dot.inactive { background: #f44336; }
+        .status-dot.waiting { background: #ff9800; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ===== КАРТОЧКА ИЗОБРАЖЕНИЯ ===== */
+        .image-card {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 998;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 20px;
+            padding: 16px;
+            display: none;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        }
+
+        .image-card.active {
+            display: block;
+            animation: slideUp 0.4s ease;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateX(-50%) translateY(30px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        .image-card img {
+            width: 100%;
+            max-height: 350px;
+            object-fit: contain;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.05);
+        }
+
+        .image-card .card-info {
+            margin-top: 12px;
+            color: white;
+            text-align: center;
+        }
+
+        .image-card .card-info h4 {
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .image-card .card-info p {
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        .image-card .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .image-card .delete-point-btn {
+            width: 100%;
+            margin-top: 10px;
+            padding: 8px;
+            background: rgba(239,83,80,0.3);
+            border: 1px solid rgba(239,83,80,0.5);
+            color: #ef5350;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .image-card .delete-point-btn:hover {
+            background: rgba(239,83,80,0.5);
+        }
+
+        /* ===== МОДАЛЬНОЕ ОКНО ВХОДА ===== */
+        .login-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 2000;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-overlay.hidden {
+            display: none;
+        }
+
+        .login-box {
+            background: rgba(30,30,30,0.95);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 20px;
+            padding: 40px;
+            width: 360px;
+            text-align: center;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+        }
+
+        .login-box h2 {
+            color: white;
+            margin-bottom: 8px;
+            font-size: 22px;
+        }
+
+        .login-box p {
+            color: #888;
+            font-size: 13px;
+            margin-bottom: 24px;
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.08);
+            color: white;
+            font-size: 15px;
+            outline: none;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .login-box input:focus {
+            border-color: #4fc3f7;
+        }
+
+        .login-box button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 8px;
+        }
+
+        .login-box .error-msg {
+            color: #ef5350;
+            font-size: 13px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .login-box .skip-btn {
+            background: transparent;
+            color: #888;
+            border: 1px solid rgba(255,255,255,0.1);
+            margin-top: 12px;
+        }
+
+        .login-box .skip-btn:hover {
+            color: white;
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        /* ===== ИНФО ПАНЕЛЬ ===== */
+        .info-bar {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 997;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 14px;
+            padding: 14px 20px;
+            color: white;
+            font-size: 13px;
+            max-width: 280px;
+        }
+
+        .info-bar h4 {
+            font-size: 15px;
+            margin-bottom: 6px;
+            color: #4fc3f7;
+        }
+
+        .info-bar .coords {
+            font-family: 'Courier New', monospace;
+            color: #aaa;
+            font-size: 12px;
+        }
+
+        /* ===== РЕЖИМ ДОБАВЛЕНИЯ ===== */
+        .add-mode-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 997;
+            background: rgba(255, 152, 0, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 30px;
+            padding: 12px 24px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 10px 40px rgba(255,152,0,0.3);
+        }
+
+        .add-mode-bar.active {
+            display: flex;
+            animation: slideUp 0.3s ease;
+        }
+
+        /* ===== TOAST ===== */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3000;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 12px;
+            padding: 12px 24px;
+            color: white;
+            font-size: 14px;
+            display: none;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+        }
+
+        .toast.show {
+            display: block;
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
+        }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        @keyframes toastOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        /* ===== СПИСОК ТОЧЕК ===== */
+        .points-list {
+            margin-top: 16px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .points-list::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .points-list::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+        }
+
+        .point-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .point-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .point-item .point-name {
+            color: white;
+        }
+
+        .point-item .point-delete {
+            background: none;
+            border: none;
+            color: #ef5350;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 2px 6px;
+        }
+
+        /* ===== МОДАЛКА ДОБАВЛЕНИЯ ФОТО ===== */
+        .photo-modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 2500;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(10px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .photo-modal.active {
+            display: flex;
+        }
+
+        .photo-modal-content {
+            background: rgba(30,30,30,0.95);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 20px;
+            padding: 30px;
+            width: 380px;
+            max-width: 90vw;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+        }
+
+        .photo-modal-content h3 {
+            color: white;
+            margin-bottom: 16px;
+            font-size: 18px;
+        }
+
+        .photo-modal-content label {
+            display: block;
+            color: #aaa;
+            font-size: 13px;
+            margin-bottom: 6px;
+            margin-top: 12px;
+        }
+
+        .photo-modal-content input[type="text"] {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.08);
+            color: white;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .photo-modal-content input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.08);
+            color: white;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .photo-modal-content .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .photo-modal-content .btn-group button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* ===== CUSTOM CESIUM STYLES ===== */
+        .cesium-viewer-bottom {
+            display: none !important;
+        }
+
+        .cesium-viewer-toolbar {
+            top: 70px !important;
+            right: 20px !important;
+        }
+
+        .cesium-animationContainer,
+        .cesium-timelineContainer {
+            display: none !important;
+        }
+
+        .cesium-viewer-geocoderContainer {
+            display: none !important;
+        }
+
+        .cesium-credit-logoContainer {
+            display: none !important;
+        }
+
+        .cesium-selection-wrapper {
+            display: none !important;
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 600px) {
+            .admin-panel {
+                width: calc(100vw - 40px);
+                right: 20px;
+                top: 60px;
+            }
+
+            .info-bar {
+                top: 60px;
+                left: 10px;
+                right: 10px;
+                max-width: none;
+            }
+
+            .login-box {
+                width: calc(100vw - 40px);
+                padding: 30px 20px;
+            }
+
+            .photo-modal-content {
+                width: calc(100vw - 40px);
+                padding: 20px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div id="loader">
-        <div class="spinner"></div>
-        <div>Загрузка карты...</div>
-        <div id="error-box"></div>
-    </div>
-    
-    <div id="loginOverlay">
+
+    <!-- Cesium Container -->
+    <div id="cesiumContainer"></div>
+
+    <!-- Toast уведомление -->
+    <div class="toast" id="toast"></div>
+
+    <!-- ===== МОДАЛКА ВХОДА ===== -->
+    <div class="login-overlay" id="loginOverlay">
         <div class="login-box">
-            <h2>🌍 Офлайн Карта</h2>
-            <input type="password" id="pwd" placeholder="Пароль">
-            <button class="login-btn btn-admin" onclick="login(true)">🔐 Владелец</button>
-            <button class="login-btn btn-visitor" onclick="login(false)">👁 Гость</button>
-            <div id="loginError">Неверный пароль!</div>
+            <h2>🔐 Вход для владельца</h2>
+            <p>Введите пароль для управления глобусом</p>
+            <input type="password" id="loginPassword" placeholder="Введите пароль" autocomplete="off">
+            <button class="btn-primary" onclick="attemptLogin()">Войти</button>
+            <button class="skip-btn" onclick="skipLogin()">👁 Смотреть как посетитель</button>
+            <div class="error-msg" id="loginError">Неверный пароль!</div>
         </div>
     </div>
 
-    <div id="map">
-        <canvas id="grid"></canvas>
-    </div>
-    
-    <div id="adminPanel">
-        <button class="panel-btn" id="btnTrack" onclick="toggleTrack()">📍 GPS</button>
-        <button class="panel-btn" id="btnAdd" onclick="toggleAdd()">📌 Точка</button>
-        <button class="panel-btn" id="btnDel" onclick="toggleDel()">🗑 Удалить</button>
-    </div>
-
-    <div id="photoPopup">
-        <button class="close" onclick="closePopup()">×</button>
-        <img id="popImg" src="" alt="">
-        <div class="info" id="popInfo"></div>
-        <div class="coords" id="popCoords"></div>
+    <!-- ===== ИНФОРМАЦИОННАЯ ПАНЕЛЬ ===== -->
+    <div class="info-bar" id="infoBar" style="display:none;">
+        <h4>📍 Моя геолокация</h4>
+        <div class="coords" id="coordsDisplay">Определение...</div>
+        <div class="status-indicator">
+            <div class="status-dot waiting" id="statusDot"></div>
+            <span id="statusText">Подключение...</span>
+        </div>
     </div>
 
-    <div id="addModal">
-        <div class="modal">
-            <h3>📌 Новая точка</h3>
-            <img id="preview">
-            <label class="file-lbl">📷 Выбрать фото<input type="file" id="fileIn" accept="image/*" onchange="previewFile(event)"></label>
-            <div class="modal-btns">
-                <button class="btn-cancel" onclick="closeModal()">Отмена</button>
-                <button class="btn-save" onclick="savePoint()">💾 Сохранить</button>
+    <!-- ===== КНОПКА АДМИНКИ ===== -->
+    <button class="admin-toggle" id="adminToggle" style="display:none;" onclick="toggleAdmin()">⚙️ Управление</button>
+
+    <!-- ===== АДМИН ПАНЕЛЬ ===== -->
+    <div class="admin-panel" id="adminPanel">
+        <h3>⚙️ Управление</h3>
+
+        <div class="status-indicator">
+            <div class="status-dot active"></div>
+            <span>Режим владельца активен</span>
+        </div>
+
+        <label>📡 Трансляция геолокации</label>
+        <button class="btn-success" onclick="startGeolocation()">▶ Начать трансляцию</button>
+        <button class="btn-danger" onclick="stopGeolocation()">⏹ Остановить</button>
+
+        <label>📌 Добавить точку с фото</label>
+        <button class="btn-primary" onclick="enableAddMode()">➕ Поставить точку на карте</button>
+
+        <label>🗑 Удалить все точки</label>
+        <button class="btn-danger" onclick="clearAllPoints()">Очистить все</button>
+
+        <label>🔑 Сменить пароль</label>
+        <input type="password" id="newPassword" placeholder="Новый пароль">
+        <button class="btn-primary" onclick="changePassword()">Сохранить пароль</button>
+
+        <label>📋 Точки на карте</label>
+        <div class="points-list" id="pointsList"></div>
+    </div>
+
+    <!-- ===== КАРТОЧКА ИЗОБРАЖЕНИЯ ===== -->
+    <div class="image-card" id="imageCard">
+        <button class="close-btn" onclick="closeImageCard()">✕</button>
+        <img id="cardImage" src="" alt="">
+        <div class="card-info">
+            <h4 id="cardTitle"></h4>
+            <p id="cardCoords"></p>
+        </div>
+        <button class="delete-point-btn" id="deletePointBtn" onclick="deleteCurrentPoint()">🗑 Удалить эту точку</button>
+    </div>
+
+    <!-- ===== РЕЖИМ ДОБАВЛЕНИЯ ===== -->
+    <div class="add-mode-bar" id="addModeBar">
+        <span>📌 Кликните на карту, чтобы поставить точку</span>
+        <button onclick="disableAddMode()" style="background:rgba(0,0,0,0.3);border:none;color:white;padding:6px 14px;border-radius:20px;cursor:pointer;font-size:13px;">✕ Отмена</button>
+    </div>
+
+    <!-- ===== МОДАЛКА ДОБАВЛЕНИЯ ФОТО ===== -->
+    <div class="photo-modal" id="photoModal">
+        <div class="photo-modal-content">
+            <h3>📸 Добавить фото к точке</h3>
+            <label>Название точки</label>
+            <input type="text" id="pointName" placeholder="Например: Мое любимое место">
+            <label>Изображение</label>
+            <input type="file" id="pointImage" accept="image/*" capture="environment">
+            <div class="btn-group">
+                <button class="btn-danger" onclick="cancelPoint()">Отмена</button>
+                <button class="btn-success" onclick="savePoint()">💾 Сохранить</button>
             </div>
         </div>
     </div>
-    
-    <div id="coords">0.0000, 0.0000</div>
-    <div id="zoomCtrl">
-        <button onclick="zoom(1)">+</button>
-        <button onclick="zoom(-1)">−</button>
-    </div>
-    <div id="toast"></div>
 
     <script>
-        // ЛОВУШКА ОШИБОК: показывает проблему на экране вместо зависания
-        window.onerror = function(msg, url, line, col, error) {
-            document.getElementById('error-box').style.display = 'block';
-            document.getElementById('error-box').innerHTML = `<b>❌ Ошибка JS:</b><br>${msg}<br>Строка: ${line}`;
-            document.querySelector('.spinner').style.display = 'none';
-            return false;
-        };
+        // ============================================
+        // КОНФИГУРАЦИЯ
+        // ============================================
+        const DEFAULT_PASSWORD = 'admin123';
+        const STORAGE_KEY = 'globe3d_data';
 
-        const PASS = "myglobe123";
-        let isAdmin=false, tracking=false, addMode=false, delMode=false;
-        let canvas, ctx, map;
-        let centerX=0, centerY=0, zoomLevel=2;
-        let watchId=null, trackMarker=null;
-        let markers={}, pending=null, photo=null;
-        let isDragging=false, lastX=0, lastY=0;
-        const TILE_SIZE=256;
+        let isAdmin = false;
+        let isAddMode = false;
+        let viewer = null;
+        let geoEntity = null;
+        let geoWatchId = null;
+        let pointEntities = {};
+        let currentPointId = null;
+        let pendingPointCoords = null;
 
-        function login(admin) {
-            if(admin && document.getElementById('pwd').value !== PASS) {
-                const e=document.getElementById('loginError'); e.style.display='block'; setTimeout(()=>e.style.display='none',2000); return;
-            }
-            isAdmin=admin;
-            document.getElementById('loginOverlay').style.display='none';
-            init();
+        // ============================================
+        // ИНИЦИАЛИЗАЦИЯ CESIUM
+        // ============================================
+        function initCesium() {
+            // Для бесплатного использования CesiumJS без токена
+            // Используем OpenStreetMap как базовый слой
+            Cesium.Ion.defaultAccessToken = undefined;
+
+            viewer = new Cesium.Viewer('cesiumContainer', {
+                baseLayer: Cesium.ImageryLayer.fromProviderAsync(
+                    Cesium.OpenStreetMapImageryProvider.fromUrl({
+                        url: 'https://a.tile.openstreetmap.org/'
+                    })
+                ),
+                baseLayerPicker: true,
+                geocoder: false,
+                homeButton: true,
+                sceneModePicker: true,
+                selectionIndicator: false,
+                timeline: false,
+                animation: false,
+                navigationHelpButton: true,
+                fullscreenButton: true,
+                infoBox: false,
+                shouldAnimate: true,
+                requestRenderMode: false,
+            });
+
+            // Включаем 3D-terrain для реалистичности
+            viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+
+            // Настройка сцены
+            viewer.scene.globe.enableLighting = true;
+            viewer.scene.globe.depthTestAgainstTerrain = true;
+
+            // Обработка кликов по карте
+            const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+            handler.setInputAction(function (click) {
+                if (isAddMode) {
+                    const cartesian = viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
+                    if (cartesian) {
+                        const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+                        const lat = Cesium.Math.toDegrees(cartographic.latitude);
+                        const lng = Cesium.Math.toDegrees(cartographic.longitude);
+                        pendingPointCoords = { lat, lng };
+                        openPhotoModal();
+                    }
+                } else {
+                    // Проверяем клик по точке
+                    const pickedObject = viewer.scene.pick(click.position);
+                    if (Cesium.defined(pickedObject) && pickedObject.id && pickedObject.id._pointData) {
+                        const data = pickedObject.id._pointData;
+                        showImageCard(data);
+                    } else {
+                        closeImageCard();
+                    }
+                }
+            }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+            showToast('🌍 Глобус загружен!');
         }
-        document.getElementById('pwd').addEventListener('keypress', e=>{if(e.key==='Enter')login(true);});
 
-        function init() {
-            try {
-                canvas=document.getElementById('grid');
-                ctx=canvas.getContext('2d');
-                map=document.getElementById('map');
-                
-                resize();
-                window.addEventListener('resize',resize);
-                
-                map.addEventListener('mousedown',dragStart);
-                map.addEventListener('mousemove',drag);
-                map.addEventListener('mouseup',dragEnd);
-                map.addEventListener('mouseleave',dragEnd);
-                map.addEventListener('wheel',wheel);
-                map.addEventListener('click',click);
-                
-                map.addEventListener('touchstart',touchStart,{passive:false});
-                map.addEventListener('touchmove',touchMove,{passive:false});
-                map.addEventListener('touchend',dragEnd);
-                
-                document.getElementById('loader').classList.add('hidden');
-                if(isAdmin) document.getElementById('adminPanel').style.display='flex';
-                
+        // ============================================
+        // АВТОРИЗАЦИЯ
+        // ============================================
+        function attemptLogin() {
+            const pwd = document.getElementById('loginPassword').value;
+            const savedPwd = localStorage.getItem('globe3d_password') || DEFAULT_PASSWORD;
+
+            if (pwd === savedPwd) {
+                isAdmin = true;
+                document.getElementById('loginOverlay').classList.add('hidden');
+                document.getElementById('infoBar').style.display = 'block';
+                document.getElementById('adminToggle').style.display = 'block';
+                showToast('✅ Вы вошли как владелец!');
                 loadPoints();
-                draw();
-                showToast('✅ Карта готова!');
+            } else {
+                document.getElementById('loginError').style.display = 'block';
+                setTimeout(() => {
+                    document.getElementById('loginError').style.display = 'none';
+                }, 2000);
+            }
+        }
+
+        function skipLogin() {
+            isAdmin = false;
+            document.getElementById('loginOverlay').classList.add('hidden');
+            document.getElementById('infoBar').style.display = 'none';
+            document.getElementById('adminToggle').style.display = 'none';
+            showToast('👁 Режим просмотра');
+            loadPoints();
+        }
+
+        // Enter для входа
+        document.getElementById('loginPassword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') attemptLogin();
+        });
+
+        // ============================================
+        // ГЕОЛОКАЦИЯ
+        // ============================================
+        function startGeolocation() {
+            if (!navigator.geolocation) {
+                showToast('❌ Геолокация не поддерживается');
+                return;
+            }
+
+            showToast('📡 Поиск местоположения...');
+
+            geoWatchId = navigator.geolocation.watchPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const accuracy = position.coords.accuracy;
+
+                    updateGeoMarker(lat, lng, accuracy);
+                    updateStatus('active', `Точность: ${Math.round(accuracy)}м`);
+                    updateCoordsDisplay(lat, lng);
+                },
+                function(error) {
+                    let msg = 'Ошибка геолокации';
+                    switch(error.code) {
+                        case 1: msg = 'Доступ запрещён. Разрешите геолокацию в настройках.'; break;
+                        case 2: msg = 'Не удалось определить местоположение'; break;
+                        case 3: msg = 'Время ожидания истекло'; break;
+                    }
+                    showToast('❌ ' + msg);
+                    updateStatus('inactive', msg);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 15000,
+                    maximumAge: 5000
+                }
+            );
+        }
+
+        function stopGeolocation() {
+            if (geoWatchId !== null) {
+                navigator.geolocation.clearWatch(geoWatchId);
+                geoWatchId = null;
+            }
+            if (geoEntity) {
+                viewer.entities.remove(geoEntity);
+                geoEntity = null;
+            }
+            updateStatus('inactive', 'Трансляция остановлена');
+            showToast('⏹ Трансляция остановлена');
+        }
+
+        function updateGeoMarker(lat, lng, accuracy) {
+            if (geoEntity) {
+                geoEntity.position = Cesium.Cartesian3.fromDegrees(lng, lat);
+                geoEntity.point.pixelSize = 16;
+                geoEntity.point.color = Cesium.Color.fromCssColorString('#4fc3f7');
+                geoEntity.point.outlineColor = Cesium.Color.fromCssColorString('#ffffff');
+                geoEntity.point.outlineWidth = 2;
+
+                // Круг точности
+                geoEntity.ellipse = {
+                    semiMajorAxis: accuracy,
+                    semiMinorAxis: accuracy,
+                    material: Cesium.Color.fromCssColorString('#4fc3f7').withAlpha(0.15),
+                    outline: true,
+                    outlineColor: Cesium.Color.fromCssColorString('#4fc3f7').withAlpha(0.5),
+                    outlineWidth: 2
+                };
+            } else {
+                geoEntity = viewer.entities.add({
+                    position: Cesium.Cartesian3.fromDegrees(lng, lat),
+                    point: {
+                        pixelSize: 16,
+                        color: Cesium.Color.fromCssColorString('#4fc3f7'),
+                        outlineColor: Cesium.Color.fromCssColorString('#ffffff'),
+                        outlineWidth: 2,
+                        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                    },
+                    ellipse: {
+                        semiMajorAxis: accuracy,
+                        semiMinorAxis: accuracy,
+                        material: Cesium.Color.fromCssColorString('#4fc3f7').withAlpha(0.15),
+                        outline: true,
+                        outlineColor: Cesium.Color.fromCssColorString('#4fc3f7').withAlpha(0.5),
+                        outlineWidth: 2,
+                        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                    },
+                    label: {
+                        text: '📍 Вы здесь',
+                        font: '14px sans-serif',
+                        fillColor: Cesium.Color.WHITE,
+                        outlineColor: Cesium.Color.BLACK,
+                        outlineWidth: 2,
+                        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                        pixelOffset: new Cesium.Cartesian2(0, -20),
+                        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                    }
+                });
+            }
+
+            // Плавно летим к точке
+            viewer.camera.flyTo({
+                destination: Cesium.Cartesian3.fromDegrees(lng, lat, 5000),
+                duration: 1.5,
+                easingFunction: Cesium.EasingFunction.CUBIC_OUT
+            });
+        }
+
+        function updateStatus(state, text) {
+            const dot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            dot.className = 'status-dot ' + state;
+            statusText.textContent = text;
+        }
+
+        function updateCoordsDisplay(lat, lng) {
+            document.getElementById('coordsDisplay').textContent =
+                `${lat.toFixed(6)}°, ${lng.toFixed(6)}°`;
+        }
+
+        // ============================================
+        // ТОЧКИ С ФОТО
+        // ============================================
+        function enableAddMode() {
+            isAddMode = true;
+            document.getElementById('addModeBar').classList.add('active');
+            showToast('📌 Кликните на карту');
+        }
+
+        function disableAddMode() {
+            isAddMode = false;
+            document.getElementById('addModeBar').classList.remove('active');
+        }
+
+        function openPhotoModal() {
+            disableAddMode();
+            document.getElementById('photoModal').classList.add('active');
+            document.getElementById('pointName').value = '';
+            document.getElementById('pointImage').value = '';
+        }
+
+        function cancelPoint() {
+            document.getElementById('photoModal').classList.remove('active');
+            pendingPointCoords = null;
+        }
+
+        function savePoint() {
+            const name = document.getElementById('pointName').value || 'Без названия';
+            const fileInput = document.getElementById('pointImage');
+
+            if (!fileInput.files.length) {
+                showToast('❌ Выберите изображение');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const imageData = e.target.result;
+                const pointId = 'point_' + Date.now();
+
+                const pointData = {
+                    id: pointId,
+                    name: name,
+                    lat: pendingPointCoords.lat,
+                    lng: pendingPointCoords.lng,
+                    image: imageData,
+                    timestamp: Date.now()
+                };
+
+                // Сохраняем
+                savePointData(pointData);
+                addPointToMap(pointData);
+                updatePointsList();
+
+                document.getElementById('photoModal').classList.remove('active');
+                pendingPointCoords = null;
+                showToast('✅ Точка добавлена!');
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        function addPointToMap(pointData) {
+            const entity = viewer.entities.add({
+                position: Cesium.Cartesian3.fromDegrees(pointData.lng, pointData.lat),
+                point: {
+                    pixelSize: 20,
+                    color: Cesium.Color.fromCssColorString('#ff9800'),
+                    outlineColor: Cesium.Color.fromCssColorString('#ffffff'),
+                    outlineWidth: 3,
+                    heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                },
+                label: {
+                    text: pointData.name,
+                    font: '13px sans-serif',
+                    fillColor: Cesium.Color.WHITE,
+                    outlineColor: Cesium.Color.BLACK,
+                    outlineWidth: 2,
+                    style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                    verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                    pixelOffset: new Cesium.Cartesian2(0, -24),
+                    heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                },
+                _pointData: pointData
+            });
+
+            pointEntities[pointData.id] = entity;
+        }
+
+        function savePointData(pointData) {
+            const data = getStoredData();
+            data.points.push(pointData);
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
             } catch(e) {
-                window.onerror(e.message, '', 0, 0, e);
+                // Если localStorage переполнен, удаляем старые изображения
+                showToast('⚠️ Хранилище заполнено, удаляю старые фото');
+                if (data.points.length > 3) {
+                    data.points.splice(0, data.points.length - 3);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                }
             }
         }
 
-        function resize() {
-            canvas.width=window.innerWidth;
-            canvas.height=window.innerHeight;
-            draw();
+        function loadPoints() {
+            const data = getStoredData();
+            data.points.forEach(p => addPointToMap(p));
+            updatePointsList();
         }
 
-        function draw() {
-            ctx.clearRect(0,0,canvas.width,canvas.height);
-            ctx.fillStyle='#1e3a5f';
-            ctx.fillRect(0,0,canvas.width,canvas.height);
-            
-            const scale=Math.pow(2,zoomLevel);
-            const gridSize=Math.max(20, 50*scale);
-            const offX=centerX%gridSize;
-            const offY=centerY%gridSize;
-            
-            ctx.strokeStyle='rgba(255,255,255,0.1)';
-            ctx.lineWidth=1;
-            ctx.beginPath();
-            for(let x=offX;x<canvas.width;x+=gridSize){ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);}
-            for(let y=offY;y<canvas.height;y+=gridSize){ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);}
-            ctx.stroke();
-            
-            ctx.strokeStyle='rgba(255,255,255,0.3)';
-            ctx.lineWidth=2;
-            ctx.beginPath(); ctx.moveTo(0,latToY(0)); ctx.lineTo(canvas.width,latToY(0)); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(lngToX(0),0); ctx.lineTo(lngToX(0),canvas.height); ctx.stroke();
-            
-            Object.values(markers).forEach(renderMarker);
-            
-            const cLat=yToLat(canvas.height/2);
-            const cLng=xToLng(canvas.width/2);
-            document.getElementById('coords').textContent=`${cLat.toFixed(4)}, ${cLng.toFixed(4)}`;
+        function getStoredData() {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                return JSON.parse(raw);
+            }
+            return { points: [], password: DEFAULT_PASSWORD };
         }
 
-        function latToY(lat) {
-            const scale=Math.pow(2,zoomLevel)*TILE_SIZE;
-            const r=lat*Math.PI/180;
-            const y=(1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*scale;
-            return canvas.height/2-(y-centerY);
-        }
-        function lngToX(lng) {
-            const scale=Math.pow(2,zoomLevel)*TILE_SIZE;
-            const x=(lng+180)/360*scale;
-            return canvas.width/2-(x-centerX);
-        }
-        function yToLat(y) {
-            const scale=Math.pow(2,zoomLevel)*TILE_SIZE;
-            const n=(canvas.height/2-(y-centerY))/scale;
-            return Math.atan(Math.sinh(Math.PI*(1-2*n)))*180/Math.PI;
-        }
-        function xToLng(x) {
-            const scale=Math.pow(2,zoomLevel)*TILE_SIZE;
-            return (canvas.width/2-(x-centerX))/scale*360-180;
+        function updatePointsList() {
+            const data = getStoredData();
+            const list = document.getElementById('pointsList');
+            list.innerHTML = '';
+
+            if (data.points.length === 0) {
+                list.innerHTML = '<div style="color:#666;font-size:12px;padding:8px;">Нет точек</div>';
+                return;
+            }
+
+            data.points.forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'point-item';
+                item.innerHTML = `
+                    <span class="point-name">📌 ${p.name}</span>
+                    <button class="point-delete" onclick="event.stopPropagation(); deletePoint('${p.id}')">✕</button>
+                `;
+                item.onclick = () => {
+                    viewer.camera.flyTo({
+                        destination: Cesium.Cartesian3.fromDegrees(p.lng, p.lat, 2000),
+                        duration: 1.5
+                    });
+                    showImageCard(p);
+                };
+                list.appendChild(item);
+            });
         }
 
-        function renderMarker(m) {
-            if(m.el) m.el.remove();
-            const el=document.createElement('div');
-            el.className='marker'+(m.data.photo?' photo':'')+(m.track?' track':'')+(delMode?' del':'');
-            el.textContent=m.track?'📍':(m.data.photo?'🖼':'');
-            el.style.left=lngToX(m.data.lng)+'px';
-            el.style.top=latToY(m.data.lat)+'px';
-            el.onclick=e=>{e.stopPropagation();markerClick(m);};
-            map.appendChild(el);
-            m.el=el;
+        function deletePoint(id) {
+            const data = getStoredData();
+            data.points = data.points.filter(p => p.id !== id);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+
+            if (pointEntities[id]) {
+                viewer.entities.remove(pointEntities[id]);
+                delete pointEntities[id];
+            }
+
+            closeImageCard();
+            updatePointsList();
+            showToast('🗑 Точка удалена');
         }
 
-        function dragStart(e){isDragging=true;lastX=e.clientX;lastY=e.clientY;map.style.cursor='grabbing';}
-        function drag(e){if(!isDragging)return;centerX-=(e.clientX-lastX);centerY-=(e.clientY-lastY);lastX=e.clientX;lastY=e.clientY;draw();}
-        function dragEnd(){isDragging=false;map.style.cursor='default';}
-        function wheel(e){e.preventDefault();zoom(e.deltaY>0?-1:1);}
-        function zoom(d){zoomLevel=Math.max(1,Math.min(19,zoomLevel+d));draw();}
-        
-        function touchStart(e){if(e.touches.length===1){isDragging=true;lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;e.preventDefault();}}
-        function touchMove(e){if(!isDragging)return;centerX-=(e.touches[0].clientX-lastX);centerY-=(e.touches[0].clientY-lastY);lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;draw();e.preventDefault();}
-
-        function click(e){
-            if(e.target.classList.contains('marker'))return;
-            if(addMode && isAdmin){
-                pending={lat:yToLat(e.clientY),lng:xToLng(e.clientX)};
-                document.getElementById('addModal').style.display='flex';
+        function deleteCurrentPoint() {
+            if (currentPointId) {
+                deletePoint(currentPointId);
             }
         }
 
-        function markerClick(m){
-            if(delMode && isAdmin) deletePoint(m.id);
-            else if(m.data.photo) showPopup(m.data);
+        function clearAllPoints() {
+            if (!confirm('Удалить все точки?')) return;
+            const data = getStoredData();
+            data.points = [];
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+
+            Object.values(pointEntities).forEach(e => viewer.entities.remove(e));
+            pointEntities = {};
+            closeImageCard();
+            updatePointsList();
+            showToast('🗑 Все точки удалены');
         }
 
-        function toggleTrack(){
-            if(!isAdmin)return;
-            if(tracking) stopTrack(); else startTrack();
-        }
-        function startTrack(){
-            if(!navigator.geolocation) return showToast('❌ GPS недоступен');
-            tracking=true;
-            document.getElementById('btnTrack').classList.add('active');
-            watchId=navigator.geolocation.watchPosition(p=>updateTrack(p.coords.latitude,p.coords.longitude),e=>showToast('Ошибка GPS'),{enableHighAccuracy:true,maximumAge:5000});
-            showToast('📍 GPS включен');
-        }
-        function stopTrack(){
-            tracking=false;
-            if(watchId) navigator.geolocation.clearWatch(watchId);
-            if(trackMarker) { delete markers[trackMarker.id]; trackMarker=null; draw(); }
-            document.getElementById('btnTrack').classList.remove('active');
-        }
-        function updateTrack(lat,lng){
-            if(trackMarker) { trackMarker.data={lat,lng}; renderMarker(trackMarker); }
-            else { trackMarker={id:'track', data:{lat,lng}, track:true}; markers[trackMarker.id]=trackMarker; renderMarker(trackMarker); }
-            centerX=canvas.width/2-lngToX(lng);
-            centerY=canvas.height/2-latToY(lat);
-            draw();
+        // ============================================
+        // КАРТОЧКА ИЗОБРАЖЕНИЯ
+        // ============================================
+        function showImageCard(pointData) {
+            currentPointId = pointData.id;
+            const card = document.getElementById('imageCard');
+            document.getElementById('cardImage').src = pointData.image;
+            document.getElementById('cardTitle').textContent = pointData.name;
+            document.getElementById('cardCoords').textContent =
+                `${pointData.lat.toFixed(6)}°, ${pointData.lng.toFixed(6)}°`;
+
+            // Показываем кнопку удаления только админу
+            document.getElementById('deletePointBtn').style.display = isAdmin ? 'block' : 'none';
+
+            card.classList.add('active');
         }
 
-        function toggleAdd(){addMode=!addMode;delMode=false;document.getElementById('btnAdd').classList.toggle('active');document.getElementById('btnAdd').textContent=addMode?'📌 Кликните':'📌 Точка';if(addMode)showToast('📌 Кликните на карту');}
-        function toggleDel(){delMode=!delMode;addMode=false;document.getElementById('btnDel').classList.toggle('active');Object.values(markers).forEach(renderMarker);if(delMode)showToast('🗑 Кликните на точку');}
-
-        function closeModal(){document.getElementById('addModal').style.display='none';pending=null;photo=null;document.getElementById('preview').style.display='none';document.getElementById('fileIn').value='';}
-        function previewFile(e){
-            const f=e.target.files[0];if(!f)return;
-            if(f.size>5*1024*1024) return showToast('❌ Макс 5МБ');
-            const r=new FileReader();
-            r.onload=ev=>{photo=ev.target.result;document.getElementById('preview').src=photo;document.getElementById('preview').style.display='block';};
-            r.readAsDataURL(f);
-        }
-        function savePoint(){
-            if(!pending) return;
-            const d={id:'p_'+Date.now(),lat:pending.lat,lng:pending.lng,photo:photo,ts:Date.now()};
-            const pts=getPts();pts.push(d);localStorage.setItem('globePts',JSON.stringify(pts));
-            const m={id:d.id, data:d};markers[m.id]=m;renderMarker(m);
-            closeModal();showToast('✅ Точка добавлена');
+        function closeImageCard() {
+            document.getElementById('imageCard').classList.remove('active');
+            currentPointId = null;
         }
 
-        function getPts(){try{return JSON.parse(localStorage.getItem('globePts')||'[]');}catch{return[];}}
-        function loadPoints(){
-            const pts=getPts();
-            pts.forEach(p=>{const m={id:p.id, data:p};markers[m.id]=m;});
-        }
-        function deletePoint(id){
-            const pts=getPts().filter(p=>p.id!==id);
-            localStorage.setItem('globePts',JSON.stringify(pts));
-            if(markers[id]){if(markers[id].el)markers[id].el.remove();delete markers[id];}
-            showToast('🗑 Удалено');
+        // ============================================
+        // АДМИН ПАНЕЛЬ
+        // ============================================
+        function toggleAdmin() {
+            const panel = document.getElementById('adminPanel');
+            panel.classList.toggle('active');
         }
 
-        function showPopup(d){
-            document.getElementById('popImg').src=d.photo||'';
-            document.getElementById('popImg').style.display=d.photo?'block':'none';
-            document.getElementById('popInfo').textContent='📌 '+new Date(d.ts).toLocaleString('ru-RU');
-            document.getElementById('popCoords').textContent=`${d.lat.toFixed(6)}, ${d.lng.toFixed(6)}`;
-            document.getElementById('photoPopup').style.display='block';
+        function changePassword() {
+            const newPwd = document.getElementById('newPassword').value;
+            if (newPwd.length < 4) {
+                showToast('❌ Пароль минимум 4 символа');
+                return;
+            }
+            localStorage.setItem('globe3d_password', newPwd);
+            document.getElementById('newPassword').value = '';
+            showToast('✅ Пароль изменён!');
         }
-        function closePopup(){document.getElementById('photoPopup').style.display='none';}
-        function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',3000);}
-        
-        document.addEventListener('keydown',e=>{if(e.key==='Escape'){closePopup();closeModal();if(addMode)toggleAdd();if(delMode)toggleDel();}});
-        document.addEventListener('click',e=>{if(!document.getElementById('photoPopup').contains(e.target))closePopup();});
+
+        // ============================================
+        // TOAST
+        // ============================================
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast show';
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
+        }
+
+        // ============================================
+        // ЗАКРЫТИЕ КАРТОЧКИ ПО КЛИКУ ВНЕ ЕЁ
+        // ============================================
+        document.addEventListener('click', function(e) {
+            const card = document.getElementById('imageCard');
+            if (card.classList.contains('active') && !card.contains(e.target)) {
+                // Проверяем, не кликнули ли мы по карте (для добавления точки)
+                if (!isAddMode) {
+                    closeImageCard();
+                }
+            }
+        });
+
+        // ============================================
+        // ИНИЦИАЛИЗАЦИЯ
+        // ============================================
+        window.addEventListener('load', function() {
+            initCesium();
+        });
     </script>
 </body>
 </html>
